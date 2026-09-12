@@ -171,55 +171,65 @@ l'explication fichier par fichier, le scénario iPhone, puis un commit `feat:`.
 `VISITE-GUIDEE.md`, ce plan, section 6 de `TRANCHE-1.md` cochée, décision D2
 dans `SECURITY.md`, `git init` + commit du kit.
 
-### Étape 1 — Squelette du parcours, préparation, permission caméra, stockage
+### Étape 1 — Squelette du parcours, préparation, permission caméra, stockage ✅ (13/09/2026)
 
 Objectif : Accueil → Préparation → (permission) → écran Détection *vide* ; le
 dossier de scan est créé avec la bonne protection ; refus de permission géré.
 
-Core :
-- `Scan/ScanPhase.swift` — `enum ScanPhase: Equatable, Sendable`
-  (`preparation`, `detection`, `capture`, `finDePasse`,
-  `reconstruction(progression: Double)`, `apercu(modele: URL)`,
-  `echec(message: String)`) + fonction pure `peutTransiter(vers:)` qui encode
-  la machine à états de `TRANCHE-1.md` (annulation depuis tout état, échec
-  seulement depuis capture/reconstruction).
-- `Scan/ScanLayout.swift` — URL d'un scan (`Images/`, `Checkpoint/`,
-  `modele.usdz`) à partir d'une racine et d'un `UUID`.
-- `Scan/DiskSpacePolicy.swift` — `requiredFreeBytes` (2 Go, incertitude 6) et
-  `isSufficient(available:)`.
-- Tests : transitions autorisées/interdites, layout, seuil disque.
+Convention respectée : identifiants **anglais** dans `Scan3DCore` (comme
+`ScaleCalibration`), **français** dans l'app (comme `AccueilView`).
+
+Core (`Sources/Scan3DCore/Scan/`) :
+- `ScanPhase.swift` — `enum ScanPhase: Equatable, Sendable` (`preparation`,
+  `detection`, `capture`, `passComplete`, `reconstruction(progress: Double)`,
+  `preview(model: URL)`, `failed(message: String)`), `canTransition(to:)`,
+  `transition(to:) throws(ScanPhaseError)`, `cancellationNeedsConfirmation`.
+  L'échec est accepté depuis la détection aussi (la session peut échouer
+  avant la première photo) ; `failed → reconstruction` = « Reprendre ».
+- `ScanLayout.swift` — URL d'un scan (`root`, `imagesDirectory`,
+  `checkpointDirectory`, `modelFile`) à partir d'une racine et d'un `UUID`.
+- `DiskSpacePolicy.swift` — `requiredFreeBytes` (2 Gio, incertitude 6),
+  `isSufficient(available:)`, `missingBytes(available:)`.
+- Tests : `ScanPhaseTests.swift` (parcours nominal, 11 sauts interdits,
+  sources d'échec, reprise, confirmation d'annulation),
+  `ScanStorageTests.swift` (arborescence, types d'URL, isolation, seuil).
 
 App :
+- `App/Journal.swift` — `Logger.scan`, `Logger.stockage`.
 - `Features/Scan/ScanFlowModel.swift` — `@MainActor @Observable final class`,
-  source de vérité de la phase (store Zustand + machine XState).
-- `Features/Scan/ScanFlowView.swift` — `switch` sur la phase → sous-vue ;
-  Annuler partout.
-- `Features/Scan/PreparationView.swift` — checklist (fond uni, lumière
-  diffuse, objet mat, astuce spray matifiant).
-- `Features/Scan/CameraAuthorization.swift` —
-  `AVCaptureDevice.authorizationStatus` / `requestAccess(for: .video)` ; écran
-  explicite + lien `UIApplication.openSettingsURLString`.
-- `Features/Scan/ScanStore.swift` — crée `Application Support/Scans/<UUID>/`
-  avec l'attribut de protection (D2), `isExcludedFromBackup`, vérifie l'espace
-  via `volumeAvailableCapacityForImportantUsageKey`, supprime le dossier à
-  l'annulation.
-- `Features/Accueil/AccueilView.swift` — bouton « Nouveau scan ».
+  source de vérité de la phase ; `demarrer()` valide la transition avant
+  tout effet de bord, puis permission → espace → dossier ; `annuler()`.
+- `Features/Scan/ScanFlowView.swift` — `switch` exhaustif sur la phase,
+  Annuler (confirmation si `cancellationNeedsConfirmation`), alerte d'erreur,
+  rafraîchissement de l'autorisation au retour au premier plan.
+- `Features/Scan/PreparationView.swift` — checklist à 3 conseils + astuce
+  spray matifiant + « Commencer le scan ».
+- `Features/Scan/CameraAuthorization.swift` — statut en 3 valeurs, demande
+  au premier scan, `@unknown default`.
+- `Features/Scan/CameraRefuseeView.swift` — explication + lien Réglages.
+- `Features/Scan/ScanStore.swift` — `actor` : crée
+  `Application Support/Scans/<UUID>/{Images,Checkpoint}` avec
+  `.protectionKey = .complete`, `isExcludedFromBackup`, mesure
+  `volumeAvailableCapacityForImportantUsage`, supprime ; journalise la
+  protection réellement posée.
+- `Features/Scan/DetectionPlaceholderView.swift` — écran 3 provisoire.
+- `Features/Accueil/AccueilView.swift` — bouton « Nouveau scan » →
+  `fullScreenCover(ScanFlowView)`.
 - `Resources/PrivacyInfo.xcprivacy` — `NSPrivacyAccessedAPICategoryDiskSpace`
   / `E174.1`.
-- `Logger` (`os`) par sous-système, chemins en `privacy: .private`.
 
-Risques : chemin de sortie oublié qui laisse un dossier orphelin →
-`ScanStore.cancel()` unique, appelé par le modèle.
-Sécurité : permission demandée au premier scan, jamais au lancement ;
-E174.1 ; protection + exclusion iCloud ; aucun chemin en clair dans les logs.
-Accessibilité : chaque item de checklist a un `accessibilityLabel`, boutons
-≥ 44 pt, Dynamic Type vérifié à la taille max.
+Sécurité : permission demandée au premier scan, jamais au lancement ; E174.1 ;
+protection `.complete` + exclusion iCloud ; journaux : UUID public, chemins et
+descriptions d'erreur privés.
+Accessibilité : lignes de checklist avec `accessibilityValue` / `Hint`,
+boutons `.controlSize(.large)`, textes système (Dynamic Type).
 
 Test iPhone : Nouveau scan → checklist → prompt caméra → **refuser** → écran
-explicite avec lien Réglages, sans plantage → autoriser dans Réglages →
-revenir → écran Détection (placeholder) → Annuler → Accueil, dossier
-`Scans/<UUID>` supprimé (log `.public` du seul UUID). Simulateur : « Appareil
-non compatible » inchangé.
+« Caméra non autorisée » avec lien Réglages, sans plantage → autoriser dans
+Réglages (iOS relance l'app : c'est normal) → Nouveau scan → Commencer →
+écran Détection avec l'identifiant court → Console : « Scan <UUID> créé,
+protection NSFileProtectionComplete » → Annuler → Accueil, Console :
+« Scan <UUID> supprimé ». Simulateur : « Appareil non compatible » inchangé.
 
 ### Étape 2 — Capture guidée (écrans 3, 4, 5)
 

@@ -1,18 +1,27 @@
 import SwiftUI
 import RealityKit
 
-/// Écran d'accueil provisoire : vérifie que l'appareil sait scanner.
-/// La tranche 1 remplacera le contenu par le parcours de scan guidé.
+/// Écran d'accueil : vérifie que l'appareil sait scanner et lance le parcours.
 struct AccueilView: View {
+    @State private var nouveauScan = false
+
     var body: some View {
         NavigationStack {
             Group {
                 if appareilCompatible {
-                    ContentUnavailableView(
-                        "Prêt à scanner",
-                        systemImage: "cube.transparent",
-                        description: Text("Le scan guidé arrive avec la tranche 1.")
-                    )
+                    ContentUnavailableView {
+                        Label("Prêt à scanner", systemImage: "cube.transparent")
+                    } description: {
+                        Text("Posez l'objet sur une table dégagée, puis lancez un nouveau scan.")
+                    } actions: {
+                        Button {
+                            nouveauScan = true
+                        } label: {
+                            Label("Nouveau scan", systemImage: "camera.viewfinder")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    }
                 } else {
                     ContentUnavailableView(
                         "Appareil non compatible",
@@ -22,6 +31,11 @@ struct AccueilView: View {
                 }
             }
             .navigationTitle("Scan3D")
+            // Plein écran : le parcours est immersif (caméra) et a son propre
+            // bouton Annuler ; pas de retour arrière par glissement.
+            .fullScreenCover(isPresented: $nouveauScan) {
+                ScanFlowView()
+            }
         }
     }
 

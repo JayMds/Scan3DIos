@@ -3,8 +3,9 @@
 <!--
   Manifeste de confidentialité exigé par l'App Store.
   Scan3D ne piste pas l'utilisateur et ne collecte aucune donnée.
-  À COMPLÉTER dès qu'une API « à raison requise » est utilisée
-  (UserDefaults, dates de modification de fichiers, espace disque…).
+  Chaque API « à raison requise » utilisée est déclarée ci-dessous :
+  - Espace disque, raison E174.1 : on vérifie l'espace libre avant une
+    capture et on refuse de démarrer s'il manque (ScanStore.espaceDisponible).
 -->
 <plist version="1.0">
 <dict>
@@ -15,6 +16,15 @@
     <key>NSPrivacyCollectedDataTypes</key>
     <array/>
     <key>NSPrivacyAccessedAPITypes</key>
-    <array/>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

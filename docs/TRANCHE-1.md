@@ -37,12 +37,15 @@ Une seule source de vérité pour l'écran courant, dans un modèle
 `@Observable` (analogue : un store Zustand piloté par une machine XState).
 
 ```
-preparation → detection → capture ⇄ finDePasse → reconstruction → apercu
-      ↘ annule (depuis tout état)      ↘ echec(message) (depuis capture/reconstruction)
+preparation → detection → capture ⇄ passComplete → reconstruction → preview
+      ↘ annule (depuis tout état)      ↘ failed(message) (depuis detection/capture/reconstruction)
+                                        failed → reconstruction (« Reprendre »)
 ```
 
-Représentée par un `enum ScanPhase` avec valeurs associées
-(ex. `reconstruction(progression: Double)`, `apercu(modele: URL)`).
+Représentée par `enum ScanPhase` dans `Scan3DCore` (identifiants anglais,
+comme le reste du paquet) avec valeurs associées
+(`reconstruction(progress: Double)`, `preview(model: URL)`,
+`failed(message: String)`) et une seule porte d'entrée, `transition(to:)`.
 
 ### Stockage
 

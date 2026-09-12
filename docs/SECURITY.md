@@ -36,8 +36,15 @@ traîne. On traite ces photos comme des données personnelles.
 - `.completeUntilFirstUserAuthentication` (défaut iOS) : accessible dès le
   premier déverrouillage après démarrage.
 
-Décision à prendre en tranche 1 (proposer les options à Jinkuro), puis
-tester le scénario « verrouillage pendant la reconstruction ».
+**Décision (12/09/2026)** : `.complete` sur `Scans/<UUID>/`, posé à la
+création du dossier, plus `isExcludedFromBackup`. Justification : l'app est
+suspendue dès que l'écran se verrouille (pas de tâche de fond), donc le seul
+risque est une lecture en cours à l'instant du verrouillage → la
+reconstruction signale une erreur et propose « Reprendre » (repart du
+checkpoint, quelques secondes). Règle de bascule : si le scénario
+« verrouillage pendant la reconstruction » (`TRANCHE-1.md` §5, point 5)
+échoue trop souvent, passer à `.completeUnlessOpen` et consigner ici le
+résultat mesuré.
 
 ## Checklist App Store
 

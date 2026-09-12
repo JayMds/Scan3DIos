@@ -100,9 +100,9 @@ terminée si l'une des deux échoue.
   `ObjectCaptureSession.isSupported` et afficher un écran explicite sinon.
 - **Une seule session de capture** active à la fois ; la libérer
   explicitement quand on quitte l'écran (mémoire importante).
-- **Reconstruction sur iPhone** : niveaux de détail limités par rapport au
-  Mac. Vérifier les options disponibles dans la doc Apple de
-  `PhotogrammetrySession.Request` avant d'en supposer une.
+- **Reconstruction sur iPhone** : un seul niveau de détail, `.reduced`
+  (< 50 k triangles ; vérifié dans la doc Apple le 12/09/2026). `.medium`,
+  `.full`, `.raw` sont macOS seulement → rôle du compagnon Mac (tranche 4).
 - **Verrouillage de l'écran** : une reconstruction dure plusieurs minutes. La
   protection de fichiers `.complete` rend les fichiers illisibles quand
   l'iPhone se verrouille → voir `docs/SECURITY.md` pour le choix retenu.

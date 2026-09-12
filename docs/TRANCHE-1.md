@@ -54,8 +54,9 @@ Application Support/Scans/<UUID>/
 ```
 
 - Vérifier l'espace disque disponible **avant** de démarrer une capture
-  (API à raison requise → mettre à jour `PrivacyInfo.xcprivacy`, raison
-  E174.1 à confirmer dans la doc Apple).
+  (API à raison requise → mettre à jour `PrivacyInfo.xcprivacy`, catégorie
+  `NSPrivacyAccessedAPICategoryDiskSpace`, raison E174.1 — confirmée le
+  12/09/2026).
 - Exclure `Scans/` de la sauvegarde iCloud (`isExcludedFromBackup`) : données
   volumineuses et régénérables.
 
@@ -66,7 +67,9 @@ Application Support/Scans/<UUID>/
   la reconstruction, et la réactiver dans **tous** les chemins de sortie.
 - `PhotogrammetrySession` avec requête `.modelFile(url:)`, consommation de
   `session.outputs` (flux `AsyncSequence`, analogue d'un `for await` sur un
-  flux d'événements en TypeScript).
+  flux d'événements en TypeScript). Niveau de détail : `.reduced`, le
+  **seul** disponible sur iOS (doc Apple vérifiée le 12/09/2026) → aucun
+  choix de qualité dans l'UI.
 - Libérer explicitement la session de capture avant de lancer la
   reconstruction (mémoire).
 
@@ -85,7 +88,10 @@ Application Support/Scans/<UUID>/
   écran explicite si refusée, avec lien vers Réglages.
 - Aucune photo ne quitte l'appareil sans action explicite de l'utilisateur.
 - Vérifier que les images de capture ne contiennent pas de coordonnées GPS ;
-  si oui, les retirer avant tout partage.
+  si oui, les retirer avant tout partage. Sans objet en tranche 1 : l'app ne
+  demande jamais la localisation et seul le STL (géométrie pure, sans
+  métadonnées) quitte l'appareil. À traiter en tranche 4 (transfert des
+  photos vers le Mac).
 
 ## 4. Accessibilité
 
@@ -103,11 +109,19 @@ Application Support/Scans/<UUID>/
    comportement.
 6. Refuser la permission caméra : l'app doit l'expliquer sans planter.
 
-## 6. Décisions à valider par Jinkuro avant d'implémenter
+## 6. Décisions validées par Jinkuro (12/09/2026)
 
-- [ ] Garder les images après reconstruction (utile pour la tranche 4, coûte
-      de la place) ou les supprimer (proposer les options).
-- [ ] Protection des fichiers de scan : `.complete` ou
-      `.completeUnlessOpen` (voir `SECURITY.md`).
-- [ ] Aperçu 3D : `RealityView` (intégré, personnalisable) ou Quick Look
-      (natif, zéro effort, moins de contrôle).
+Options étudiées et plan d'étapes : `TRANCHE-1-PLAN.md`.
+
+- [x] Images après reconstruction : **supprimées** (`Images/` + `Checkpoint/`)
+      après un succès, conservées en cas d'échec pour réessayer. Une
+      préférence opt-in « conserver pour le Mac » arrivera en tranche 4.
+- [x] Protection des fichiers de scan : **`.complete`**, avec un bouton
+      « Reprendre » qui repart du checkpoint. Le scénario de test n° 5 décide
+      d'une bascule vers `.completeUnlessOpen` (voir `SECURITY.md`).
+- [x] Aperçu 3D : **Quick Look** (`.quickLookPreview`), les dimensions en mm
+      restant l'information principale de l'écran. `RealityView` viendra avec
+      l'outil de mesure (tranche 2).
+- [x] (architecture) Lecture du maillage : **Model I/O dans `Scan3DCore`** +
+      écriture STL binaire maison, testées sur Mac avec un cube généré en
+      mémoire. Repli RealityKit si l'import USDZ déçoit.

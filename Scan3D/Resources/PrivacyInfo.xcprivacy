@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Manifeste de confidentialité exigé par l'App Store.
+  Scan3D ne piste pas l'utilisateur et ne collecte aucune donnée.
+  À COMPLÉTER dès qu'une API « à raison requise » est utilisée
+  (UserDefaults, dates de modification de fichiers, espace disque…).
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array/>
+</dict>
+</plist>

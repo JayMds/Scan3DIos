@@ -1,0 +1,46 @@
+# Source de vérité du projet Xcode.
+# Après toute modification : `make generate`. Ne jamais éditer le .xcodeproj.
+name: Scan3D
+
+options:
+  bundleIdPrefix: fr.jinkuro        # À adapter si besoin (doit être unique sur l'App Store)
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: "K6K6R9F5HT"            # ← Ton Team ID Apple Developer (10 caractères)
+    CODE_SIGN_STYLE: Automatic
+
+packages:
+  Scan3DCore:
+    path: Packages/Scan3DCore
+
+targets:
+  Scan3D:
+    type: application
+    platform: iOS
+    sources:
+      - path: Scan3D
+    dependencies:
+      - package: Scan3DCore
+    info:
+      path: Scan3D/Info.plist
+      properties:
+        CFBundleDisplayName: Scan3D
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiredDeviceCapabilities: [arkit]
+        NSCameraUsageDescription: >-
+          Scan3D utilise la caméra pour photographier l'objet sous tous les angles
+          et reconstruire son modèle 3D. Les images restent sur votre appareil.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.jinkuro.scan3d
+        TARGETED_DEVICE_FAMILY: "1"
+    scheme:
+      gatherCoverageData: true

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make generate)",
+      "Bash(make test-core)",
+      "Bash(make build-check)",
+      "Bash(xcodegen generate)",
+      "Bash(swift test *)",
+      "Bash(swift build *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(xcodebuild *)"
+    ],
+    "deny": [
+      "Edit(**/*.pbxproj)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(rm -rf *)",
+      "Bash(curl *)"
+    ]
+  }
+}

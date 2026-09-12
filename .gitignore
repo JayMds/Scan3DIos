@@ -1,0 +1,29 @@
+# Projet Xcode généré par XcodeGen (source de vérité : project.yml)
+*.xcodeproj/
+Scan3D/Info.plist
+
+# Builds
+build/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+Packages/**/.build/
+
+# Données de test : les scans peuvent montrer l'intérieur d'un logement
+Scans/
+*.heic
+*.usdz
+*.stl
+*.3mf
+
+# Secrets et réglages locaux
+.env
+.env.*
+.claude/settings.local.json
+
+# macOS
+.DS_Store

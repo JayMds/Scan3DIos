@@ -13,7 +13,7 @@ struct ScanFlowView: View {
     var body: some View {
         NavigationStack {
             contenu
-                .navigationTitle("Nouveau scan")
+                .navigationTitle(titre)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -40,6 +40,9 @@ struct ScanFlowView: View {
         .onChange(of: scenePhase) { _, nouvelle in
             if nouvelle == .active { model.rafraichirAutorisation() }
         }
+        // Filet de sécurité : quel que soit le chemin de sortie, l'écran
+        // retrouve sa mise en veille.
+        .onDisappear { VeilleEcran.empecher(false) }
     }
 
     @ViewBuilder
@@ -52,16 +55,44 @@ struct ScanFlowView: View {
             switch model.phase {
             case .preparation:
                 PreparationView(model: model)
-            case .detection:
-                DetectionPlaceholderView(identifiant: model.layout?.id)
-            case .capture, .passComplete, .reconstruction, .preview, .failed:
-                // Écrans livrés par les étapes 2 à 4 du plan.
+            case .detection, .capture:
+                if let capture = model.capture {
+                    CaptureView(model: model, controller: capture)
+                } else {
+                    ProgressView("Ouverture de la caméra…")
+                }
+            case .passComplete:
+                if let capture = model.capture {
+                    FinDePasseView(model: model, controller: capture)
+                } else {
+                    ProgressView()
+                }
+            case .reconstruction:
+                ReconstructionPlaceholderView(bilan: model.bilanCapture)
+            case .preview:
+                // Écran livré par l'étape 4 du plan.
                 ContentUnavailableView(
                     "Étape à venir",
                     systemImage: "hammer",
-                    description: Text("Cet écran arrive dans une prochaine étape.")
+                    description: Text("L'aperçu du modèle arrive à l'étape 4.")
                 )
+            case .failed(let message):
+                EchecView(message: message) {
+                    Task { await annuler() }
+                }
             }
+        }
+    }
+
+    private var titre: String {
+        switch model.phase {
+        case .preparation: "Préparation"
+        case .detection: "Détection"
+        case .capture: "Capture"
+        case .passComplete: "Passe terminée"
+        case .reconstruction: "Reconstruction"
+        case .preview: "Aperçu"
+        case .failed: "Erreur"
         }
     }
 

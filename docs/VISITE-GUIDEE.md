@@ -252,13 +252,95 @@ avec confirmation, alerte d'erreur.
   les cases cochées.
 - Accessibilité : `accessibilityValue`, `accessibilityHint`.
 
-### `Scan3D/Features/Scan/CameraRefuseeView.swift` et `DetectionPlaceholderView.swift`
+### `Scan3D/Features/Scan/CameraRefuseeView.swift`
 
-**Rôle** : écran de refus caméra (lien Réglages) ; écran de détection
-provisoire (affiche l'identifiant court du scan).
+**Rôle** : écran de refus caméra (lien Réglages). (Le
+`DetectionPlaceholderView` de l'étape 1 a été remplacé par `CaptureView` à
+l'étape 2.)
 
 - `ContentUnavailableView` avec `actions:` ; `if let` sur une URL optionnelle
   (§2) ; `Link`.
+
+## Tranche 1 — étape 2 : capture guidée
+
+Ajoutés le 13/09/2026.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Capture/CaptureHint.swift`
+
+**Rôle** : les 9 conseils de capture, miroir neutre des `Feedback` de
+RealityKit, avec leur priorité d'annonce.
+
+- L'**ordre de déclaration** d'une enum `CaseIterable` sert de priorité :
+  `allCases.firstIndex(of:)`.
+- `Set<CaptureHint>` + `min(by:)` pour choisir le plus urgent.
+- Tests `CaptureHintTests.swift` : vérifient aussi que les priorités sont
+  uniques et consécutives (0…8).
+
+### `Scan3D/Features/Capture/CaptureController.swift`
+
+**Rôle** : possède l'unique `ObjectCaptureSession`, la démarre, la commande,
+la libère, et traduit ses états en événements pour le modèle.
+
+- `#if !targetEnvironment(simulator)` autour du fichier entier.
+- **Cross-import overlay** : `import RealityKit` **et** `import SwiftUI`
+  obligatoires pour voir `ObjectCaptureSession`.
+- `for await etat in session.stateUpdates` (§9) dans un
+  `Task { [weak self] in … }` : consommer un flux d'événements, comme un
+  `for await` sur un `AsyncIterable` TS ; `[weak self]` évite que la tâche
+  retienne le contrôleur en vie.
+- `for await … where complete` : filtre directement dans la boucle.
+- `@unknown default` sur les enums de RealityKit (le framework peut ajouter
+  des cas).
+- `init?(_:)` : initialiseur **échouable** (renvoie `nil`), utilisé avec
+  `compactMap`.
+- `try? await Task.sleep(for: .milliseconds(250))` : attente non bloquante.
+
+### `Scan3D/Features/Capture/CaptureView.swift`
+
+**Rôle** : écrans 3 et 4 — `ObjectCaptureView` en fond, bandeau de conseil,
+commandes selon `session.state`.
+
+- `ZStack(alignment: .bottom)` + `.ignoresSafeArea()` seulement sur la
+  caméra, pour que les boutons restent au-dessus de l'indicateur d'accueil.
+- `switch` dans une fonction `@ViewBuilder` sur l'état de la session.
+- `.sensoryFeedback(.warning, trigger:condition:)` : haptique déclarative
+  (iOS 17).
+- `AccessibilityNotification.Announcement(…).post()` : annonce VoiceOver.
+- `static let` sur une vue pour une constante de réglage.
+
+### `Scan3D/Features/Capture/FinDePasseView.swift`
+
+**Rôle** : écran 5 — nuage de points capturé + trois choix.
+
+- `ObjectCapturePointCloudView(session:)` ; `if / else` dans la vue pour
+  masquer « Retourner » quand RealityKit le déconseille.
+
+### `Scan3D/Features/Capture/CaptureSimulateur.swift`
+
+**Rôle** : doublures (`CaptureController`, `CaptureView`, `FinDePasseView`)
+sous `#if targetEnvironment(simulator)`, même interface que les vrais types.
+
+- Deux déclarations du même type dans deux fichiers, jamais compilées
+  ensemble : c'est le `#if` qui garantit l'unicité.
+
+### `Scan3D/Features/Capture/CaptureHint+Texte.swift` et `VeilleEcran.swift`
+
+- `extension` d'un type de Core pour y ajouter de l'UI (les textes) sans
+  polluer Core ; `@MainActor enum` avec `static func` pour
+  `isIdleTimerDisabled`.
+
+### `Scan3D/Features/Scan/EchecView.swift` et `ReconstructionPlaceholderView.swift`
+
+- Vues « feuilles » avec closure en paramètre (`let fermer: () -> Void`)
+  ≈ prop callback.
+
+### Modifiés à l'étape 2
+
+- `ScanFlowModel.swift` — événements du contrôleur → transitions, mesure des
+  photos (`bilanCapture`).
+- `ScanFlowView.swift` — titre par phase, nouvelles sous-vues, `onDisappear`.
+- `ScanStore.swift` — `tailleImages` : `FileManager.enumerator` et
+  `for case let url as URL` (boucle avec motif de cast).
 
 ## Les fichiers non-Swift
 

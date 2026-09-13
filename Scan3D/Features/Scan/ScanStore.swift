@@ -61,6 +61,27 @@ actor ScanStore {
         return layout
     }
 
+    /// Nombre de fichiers et poids du dossier `Images/`, pour calibrer le seuil
+    /// de `DiskSpacePolicy`. `fileSize` n'est pas une API « à raison requise »
+    /// (seuls les horodatages de fichiers le sont).
+    func tailleImages(_ layout: ScanLayout) -> (fichiers: Int, octets: Int64) {
+        let cles: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey]
+        guard let enumerateur = FileManager.default.enumerator(
+            at: layout.imagesDirectory,
+            includingPropertiesForKeys: Array(cles),
+            options: [.skipsHiddenFiles]
+        ) else { return (0, 0) }
+
+        var fichiers = 0
+        var octets: Int64 = 0
+        for case let url as URL in enumerateur {
+            guard let valeurs = try? url.resourceValues(forKeys: cles), valeurs.isRegularFile == true else { continue }
+            fichiers += 1
+            octets += Int64(valeurs.fileSize ?? 0)
+        }
+        return (fichiers, octets)
+    }
+
     /// Supprime tout le dossier du scan, photos comprises. Sans effet s'il n'existe plus.
     func supprimer(_ layout: ScanLayout) throws {
         guard FileManager.default.fileExists(atPath: layout.root.path(percentEncoded: false)) else { return }

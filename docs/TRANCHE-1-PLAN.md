@@ -231,52 +231,77 @@ Réglages (iOS relance l'app : c'est normal) → Nouveau scan → Commencer →
 protection NSFileProtectionComplete » → Annuler → Accueil, Console :
 « Scan <UUID> supprimé ». Simulateur : « Appareil non compatible » inchangé.
 
-### Étape 2 — Capture guidée (écrans 3, 4, 5)
+### Étape 2 — Capture guidée (écrans 3, 4, 5) ✅ (13/09/2026)
 
 Objectif : détecter, ajuster la boîte, capturer une ou plusieurs passes,
 retourner l'objet, terminer → phase `reconstruction` (placeholder). Tout le
-code RealityKit sous `#if !targetEnvironment(simulator)`.
+code RealityKit sous `#if !targetEnvironment(simulator)`, avec des doublures
+de même interface pour le simulateur.
 
 Core :
-- `Capture/CaptureHint.swift` — `enum CaptureHint` (miroir neutre des 9
-  `Feedback`) + texte FR + **priorité** quand plusieurs conseils sont actifs
-  (ex. `environmentTooDark` > `objectTooClose` > `movingTooFast`). Tests :
-  priorité, couverture des 9 cas.
+- `Capture/CaptureHint.swift` — `enum CaptureHint` (miroir des 9 `Feedback`),
+  ordre de déclaration = ordre d'urgence (`priority`), `blocksCapture`,
+  `mostUrgent(in:)`. Tests : `CaptureHintTests.swift` (5 tests).
 
 App :
-- `Features/Capture/CaptureController.swift` — possède
-  l'`ObjectCaptureSession`, `start(...)` avec `Configuration`
-  (`checkpointDirectory` = dossier vide, `isOverCaptureEnabled = false`),
-  consomme `stateUpdates`, `feedbackUpdates`, `userCompletedScanPassUpdates`
-  dans des `Task` ; mappe `Feedback → CaptureHint` ; libère la session
-  (`= nil`) à `.completed`, `.failed`, annulation.
+- `Features/Capture/CaptureController.swift` — `@MainActor @Observable`,
+  unique propriétaire de l'`ObjectCaptureSession` : `demarrer()` (config
+  `checkpointDirectory` = dossier vide, `isOverCaptureEnabled = false`),
+  commandes (`startDetecting`, `resetDetection`, `startCapturing`,
+  `beginNewScanPass`, `beginNewScanPassAfterFlip`, `finish`), `annuler()`
+  (cancel + attente ≤ 2 s que la session finisse d'écrire), deux `Task` sur
+  `stateUpdates` et `userCompletedScanPassUpdates` → événements
+  `captureCommencee / passeTerminee / terminee / echec` ; libère la session
+  (`= nil`) à `.completed`, `.failed`, annulation. Conversion
+  `Feedback → CaptureHint` avec `@unknown default`.
 - `Features/Capture/CaptureView.swift` — `ObjectCaptureView(session:)` +
-  overlay : conseil courant, compteur
-  `numberOfShotsTaken / maximumNumberOfInputImages`, Continuer / Terminer.
-- `Features/Capture/FinDePasseView.swift` —
-  `ObjectCapturePointCloudView(session:)` + trois choix : nouvelle passe
-  (`beginNewScanPass`), retourner (`beginNewScanPassAfterFlip`, masqué si
-  `feedback` contient `.objectNotFlippable`), terminer (`finish`).
-- `Features/Capture/CaptureFeedbackAnnouncer.swift` — haptique
-  (`UINotificationFeedbackGenerator`) + `AccessibilityNotification.Announcement`
-  pour chaque nouveau conseil ; `shouldPlayHaptics` de la session laissé actif.
-- `ScanFlowModel` : `isIdleTimerDisabled = true` à l'entrée en capture, remis
-  à `false` dans **tous** les chemins (`defer`) ; annulation pendant la
-  capture → `confirmationDialog`.
+  bandeau du conseil courant (rouge s'il bloque), commandes selon
+  `session.state` (`.ready` Continuer ; `.detecting` Recommencer / Commencer
+  la capture ; `.capturing` compteur `n / max` + « Terminer sans finir le
+  tour » dès 20 photos), `.sensoryFeedback(.warning)` + annonce VoiceOver à
+  chaque nouveau conseil.
+- `Features/Capture/FinDePasseView.swift` — `ObjectCapturePointCloudView` +
+  nouvelle passe / retourner (masqué si `.objectNotFlippable`) / terminer.
+- `Features/Capture/CaptureSimulateur.swift` — doublures simulateur.
+- `Features/Capture/CaptureHint+Texte.swift` — textes FR des 9 conseils.
+- `Features/Capture/VeilleEcran.swift` — `isIdleTimerDisabled`, activé de la
+  détection à la fin de capture, coupé sur tous les chemins de sortie et à
+  l'`onDisappear` du conteneur.
+- `Features/Scan/ScanFlowModel.swift` — crée le contrôleur après le dossier,
+  traduit ses événements en transitions (`captureCommencee` seulement depuis
+  `.detection` ; les passes suivantes transitent elles-mêmes car la session
+  reste en `.capturing`), mesure `Images/` à la fin (`bilanCapture`).
+- `Features/Scan/ScanFlowView.swift` — titre par phase, `CaptureView` pour
+  `.detection` / `.capture`, `FinDePasseView`, `ReconstructionPlaceholderView`,
+  `EchecView` (Fermer = supprimer le dossier).
+- `Features/Scan/ScanStore.swift` — `tailleImages(_:)` (fichiers + octets ;
+  `fileSize` n'est pas une API à raison requise).
+- Supprimé : `DetectionPlaceholderView.swift`.
 
-Risques : une seule session à la fois (mémoire) → le contrôleur est l'unique
-propriétaire ; `checkpointDirectory` non vide → `.failed` ; Swift 6 et les
-`Task` de consommation (tout reste `@MainActor`).
-Sécurité : aucune image ne quitte `Scans/<UUID>/Images` ; log de la taille du
-dossier (octets, pas de chemin) pour calibrer l'incertitude 6.
-Accessibilité : conseils annoncés à VoiceOver + haptique, jamais visuel seul ;
-boutons de fin de passe ≥ 44 pt, libellés explicites.
+Piège rencontré : `ObjectCaptureSession` / `ObjectCaptureView` viennent du
+**cross-import overlay** RealityKit × SwiftUI — le type n'existe que dans un
+fichier qui importe les deux modules (ajouté aux pièges de `CLAUDE.md`).
 
-Test iPhone : boîte mate sur table claire → détection, ajuster la boîte →
-capture d'une passe (haptique ; VoiceOver activé : « Trop près », etc.) → fin
-de passe : nuage de points, « Retourner » → deuxième passe → Terminer → phase
-reconstruction (placeholder). Annuler en pleine capture → confirmation →
-dossier supprimé, veille réactivée.
+Risques restants : l'état exact après `cancel()` n'est pas documenté (on
+attend `.completed` / `.failed` au plus 2 s) ; le simulateur n'est pas
+compilé par `make build-check` (destination iOS générique) — à vérifier une
+fois dans Xcode.
+Sécurité : aucune image ne quitte `Scans/<UUID>/Images` ; taille du dossier
+journalisée en octets, jamais de chemin ; session libérée à chaque sortie.
+Accessibilité : conseils = bandeau + haptique + annonce VoiceOver ; compteur
+avec `accessibilityLabel` en phrase ; nuage de points étiqueté ; boutons
+`.controlSize(.large)`.
+
+Test iPhone : boîte mate sur table claire → Nouveau scan → Commencer →
+« Détection » : viseur, Continuer → boîte englobante, l'ajuster, Commencer la
+capture → « Capture » : compteur qui monte, haptique + bandeau en s'approchant
+trop (VoiceOver : « Trop près : reculez un peu ») → tour complet → « Passe
+terminée » : nuage de points, Retourner l'objet → deuxième passe → Terminer et
+reconstruire → « Capture terminée : N photos, X Mo » (noter ces chiffres pour
+l'incertitude 6) → Console : « Capture terminée : N fichiers, X octets » →
+Annuler → confirmation → Accueil, « Scan <UUID> supprimé ». Puis : Annuler en
+pleine capture → confirmation → l'écran se remet en veille après le délai
+réglé.
 
 ### Étape 3 — Reconstruction sur l'iPhone
 

@@ -100,6 +100,9 @@ terminée si l'une des deux échoue.
   `ObjectCaptureSession.isSupported` et afficher un écran explicite sinon.
 - **Une seule session de capture** active à la fois ; la libérer
   explicitement quand on quitte l'écran (mémoire importante).
+- **Cross-import overlay** : `ObjectCaptureSession`, `ObjectCaptureView` et
+  `ObjectCapturePointCloudView` n'existent que dans un fichier qui importe
+  **RealityKit et SwiftUI** (« cannot find type in scope » sinon).
 - **Reconstruction sur iPhone** : un seul niveau de détail, `.reduced`
   (< 50 k triangles ; vérifié dans la doc Apple le 12/09/2026). `.medium`,
   `.full`, `.raw` sont macOS seulement → rôle du compagnon Mac (tranche 4).

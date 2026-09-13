@@ -26,6 +26,10 @@ final class ScanFlowModel {
     private(set) var phase: ScanPhase = .preparation
     private(set) var autorisationCamera = CameraAuthorization.statut
     private(set) var layout: ScanLayout?
+    /// Présent de la détection à la fin de la capture ; nil ensuite (mémoire).
+    private(set) var capture: CaptureController?
+    /// « 214 photos, 830 Mo » une fois la capture terminée.
+    private(set) var bilanCapture: String?
     private(set) var demarrageEnCours = false
     /// Non nil → l'UI présente une alerte ; elle le remet à nil en la fermant.
     var erreur: ScanFlowError?
@@ -40,9 +44,11 @@ final class ScanFlowModel {
         phase.cancellationNeedsConfirmation
     }
 
+    // MARK: Préparation (écran 2)
+
     /// Bouton « Commencer » : permission caméra, espace disque, dossier du
-    /// scan, puis passage à la détection. Chaque refus laisse l'utilisateur
-    /// sur l'écran de préparation avec une explication.
+    /// scan, puis ouverture de la session de capture. Chaque refus laisse
+    /// l'utilisateur sur l'écran de préparation avec une explication.
     func demarrer() async {
         guard !demarrageEnCours else { return }
         demarrageEnCours = true
@@ -68,8 +74,10 @@ final class ScanFlowModel {
                 return
             }
 
-            layout = try await store.creerScan()
+            let nouveau = try await store.creerScan()
+            layout = nouveau
             phase = suivante
+            lancerCapture(pour: nouveau)
         } catch let erreurPhase as ScanPhaseError {
             Logger.scan.error("Transition refusée : \(String(describing: erreurPhase), privacy: .public)")
         } catch {
@@ -84,8 +92,95 @@ final class ScanFlowModel {
         autorisationCamera = CameraAuthorization.statut
     }
 
-    /// Supprime le dossier du scan (photos comprises) avant de fermer le parcours.
+    // MARK: Capture (écrans 3 à 5)
+
+    /// `false` si la session ne trouve pas d'objet devant la caméra.
+    func commencerDetection() -> Bool {
+        capture?.commencerDetection() ?? false
+    }
+
+    func reinitialiserDetection() {
+        capture?.reinitialiserDetection()
+    }
+
+    /// La phase passera à `.capture` quand la session signalera `.capturing`.
+    func commencerCapture() {
+        capture?.commencerCapture()
+    }
+
+    /// La session reste en `.capturing` et n'émet rien : on transite nous-mêmes.
+    func nouvellePasse() {
+        capture?.nouvellePasse()
+        transiter(vers: .capture)
+    }
+
+    func nouvellePasseApresRetournement() {
+        capture?.nouvellePasseApresRetournement()
+        transiter(vers: .capture)
+    }
+
+    /// La phase passera à `.reconstruction` quand la session signalera `.completed`.
+    func terminerCapture() {
+        capture?.terminer()
+    }
+
+    private func lancerCapture(pour layout: ScanLayout) {
+        let controller = CaptureController(layout: layout) { [weak self] evenement in
+            self?.traiter(evenement)
+        }
+        capture = controller
+        VeilleEcran.empecher(true)
+        controller.demarrer()
+    }
+
+    private func traiter(_ evenement: CaptureController.Evenement) {
+        switch evenement {
+        case .captureCommencee:
+            // Seule la première entrée en .capturing change de phase ; les
+            // passes suivantes sont gérées par nouvellePasse().
+            if phase == .detection { transiter(vers: .capture) }
+        case .passeTerminee:
+            if phase == .capture { transiter(vers: .passComplete) }
+        case .terminee:
+            capture = nil
+            VeilleEcran.empecher(false)
+            transiter(vers: .reconstruction(progress: 0))
+            Task { await mesurerCapture() }
+        case .echec(let message):
+            capture = nil
+            VeilleEcran.empecher(false)
+            transiter(vers: .failed(message: message))
+        }
+    }
+
+    /// Poids réel des photos : calibre `DiskSpacePolicy` (incertitude 6 du plan).
+    private func mesurerCapture() async {
+        guard let layout else { return }
+        let taille = await store.tailleImages(layout)
+        let octets = ByteCountFormatter.string(fromByteCount: taille.octets, countStyle: .file)
+        bilanCapture = "\(taille.fichiers) photos, \(octets)"
+        Logger.scan.info("Capture terminée : \(taille.fichiers, privacy: .public) fichiers, \(taille.octets, privacy: .public) octets")
+    }
+
+    /// Transition journalisée : un refus est un bug de séquencement, pas une
+    /// erreur utilisateur — on ne casse pas l'app pour ça.
+    private func transiter(vers cible: ScanPhase) {
+        do {
+            phase = try phase.transition(to: cible)
+        } catch {
+            Logger.scan.error("Transition refusée : \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    // MARK: Sortie
+
+    /// Arrête la session, puis supprime le dossier du scan (photos comprises).
     func annuler() async {
+        if let capture {
+            await capture.annuler()
+            self.capture = nil
+        }
+        VeilleEcran.empecher(false)
         guard let layout else { return }
         do {
             try await store.supprimer(layout)

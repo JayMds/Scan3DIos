@@ -351,6 +351,63 @@ checkpoint, objectif de 36 photos par tour).
 - `Picker` segmenté + `ForEach(CaptureMode.allCases)` + `.tag(mode)`.
 - Liste de conseils calculée par `Conseil.pour(mode)`.
 
+## Tranche 1 — étape 3 : reconstruction
+
+Ajoutés le 14/09/2026.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Reconstruction/ReconstructionProgress.swift`
+
+**Rôle** : transforme fraction et secondes restantes en textes (« 42 % »,
+« environ 2 min », phrase VoiceOver).
+
+- Enum imbriquée `RemainingTime` avec valeurs associées, dont une étiquetée
+  `hours(Int, minutes: Int)`.
+- `rounded(.up)` : arrondi vers le haut ; `\u{00A0}` : espace insécable.
+- **Piège rencontré** : un `switch` dont un cas déclare une variable
+  (`let heures = …`) cesse d'être une *expression* ; tous les cas doivent
+  alors écrire `return`.
+- Test paramétré avec des optionnels :
+  `[(Double?, RemainingTime?)]` et un `as` pour guider l'inférence de type.
+
+### `Scan3D/Features/Reconstruction/Reconstructor.swift`
+
+**Rôle** : possède la `PhotogrammetrySession`, la lance, la surveille,
+l'annule, et traduit ses sorties en événements.
+
+- `for try await sortie in session.outputs` : flux asynchrone qui peut
+  lever une erreur (≈ `for await` dans un `try/catch`).
+- `if case .modelFile(let url) = resultat` : extraire une valeur associée
+  sans `switch` complet.
+- `erreur as? PhotogrammetrySession.Error` : cast conditionnel (≈ `instanceof`
+  qui renvoie un optionnel).
+- `info.processingStage.map(Self.texte)` : `map` sur un **optionnel** (appelé
+  seulement s'il y a une valeur).
+- `#if … #else … #endif` dans un seul fichier : vrai type et doublure
+  simulateur côte à côte.
+
+### `Scan3D/Features/Reconstruction/ReconstructionView.swift`
+
+**Rôle** : écran 6 — barre, pourcentage, étape, temps restant.
+
+- `ProgressView(value:label:currentValueLabel:)` ; `let` locaux dans `body`
+  pour calculer une fois.
+- `.accessibilityValue` pour la phrase, `.accessibilityHidden(true)` pour ne
+  pas lire deux fois la même information.
+
+### `Scan3D/Features/Scan/EchecView.swift` et `ApercuPlaceholderView.swift` (étape 3)
+
+- Paramètre optionnel de type fonction avec valeur par défaut
+  `var reprendre: (() -> Void)? = nil` ≈ prop callback facultative.
+
+### Modifiés à l'étape 3
+
+- `ScanFlowModel.swift` — `reprendreReconstruction() async`, drapeau
+  `annulationEnCours` + `defer` pour le remettre à faux, propriété calculée
+  `scanTermine` avec `if case … { true } else { false }` en expression.
+- `ScanFlowView.swift` — bouton de barre conditionnel (« Fermer » / « Annuler »).
+- `ScanStore.swift` — boucle `for … where` pour ne supprimer que les
+  dossiers présents.
+
 ### Modifiés à l'étape 2
 
 - `ScanFlowModel.swift` — événements du contrôleur → transitions, mesure des

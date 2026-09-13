@@ -82,6 +82,29 @@ actor ScanStore {
         return (fichiers, octets)
     }
 
+    /// Décision D1 : après une reconstruction réussie, photos et checkpoint ne
+    /// servent plus sur l'iPhone (données volumineuses et sensibles) ; seul
+    /// `modele.usdz` reste.
+    func nettoyerApresReconstruction(_ layout: ScanLayout) throws {
+        for dossier in [layout.imagesDirectory, layout.checkpointDirectory]
+        where FileManager.default.fileExists(atPath: dossier.path(percentEncoded: false)) {
+            try FileManager.default.removeItem(at: dossier)
+        }
+        Logger.stockage.info("Scan \(layout.id.uuidString, privacy: .public) : photos et checkpoint supprimés après reconstruction")
+    }
+
+    /// Supprime un fichier s'il existe (ex. modèle partiel avant une reprise).
+    func supprimerFichier(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return }
+        try FileManager.default.removeItem(at: url)
+    }
+
+    /// Taille d'un fichier en octets (0 s'il n'existe pas).
+    func tailleFichier(_ url: URL) -> Int64 {
+        let taille = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        return Int64(taille ?? 0)
+    }
+
     /// Supprime tout le dossier du scan, photos comprises. Sans effet s'il n'existe plus.
     func supprimer(_ layout: ScanLayout) throws {
         guard FileManager.default.fileExists(atPath: layout.root.path(percentEncoded: false)) else { return }

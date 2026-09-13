@@ -363,41 +363,76 @@ surélever l'iPhone, refaire un tour → Terminer et reconstruire → bilan
 « N photos, X Mo ». Vérifier : la boîte reste sur l'objet pendant la
 rotation ; le bouton Photo se réactive après chaque photo.
 
-### Étape 3 — Reconstruction sur l'iPhone
+### Étape 3 — Reconstruction sur l'iPhone ✅ (14/09/2026, en attente du test iPhone)
 
 Objectif : `Images/` → `modele.usdz` avec progression réelle, annulation,
-reprise, nettoyage (D1).
+reprise, nettoyage (D1). Traite les deux modes de capture.
+
+Vérifié dans l'interface du SDK (RealityFoundation, iOS 26.5) :
+`PhotogrammetrySession.Output` et `.Result` sont `Sendable` ;
+`Outputs.next()` est `async throws` ; `ProgressInfo` expose
+`estimatedRemainingTime: TimeInterval?` et `processingStage: ProcessingStage?`
+(`preProcessing`, `imageAlignment`, `pointCloudGeneration`, `meshGeneration`,
+`textureMapping`, `optimization`).
 
 Core :
-- `Reconstruction/ReconstructionProgress.swift` — formatage pur : fraction →
-  « 42 % », temps restant → « environ 2 min » ; tests.
+- `Reconstruction/ReconstructionProgress.swift` — fraction bornée (NaN → 0),
+  pourcentage « 42 % » (espace insécable), temps restant arrondi à la minute
+  **supérieure** (`RemainingTime` : moins d'une minute / minutes / heures),
+  textes courts et parlés, phrase VoiceOver. Tests :
+  `ReconstructionProgressTests.swift` (5 tests, dont 2 paramétrés).
 
 App :
-- `Features/Reconstruction/Reconstructor.swift` — `@MainActor` :
-  `PhotogrammetrySession(input: Images, configuration: .init(checkpointDirectory: Checkpoint))`,
-  `process(requests: [.modelFile(url: modele.usdz)])` (`.reduced` implicite),
-  `for try await output in session.outputs` → `requestProgress` /
-  `requestProgressInfo` → phase `.reconstruction(progression:)`,
-  `requestComplete(.modelFile)` → `.apercu`, `requestError` /
-  `PhotogrammetrySession.Error` → `.echec(message)` localisé ; `cancel()`.
-- `Features/Reconstruction/ReconstructionView.swift` — barre + % + temps
-  estimé + « gardez l'app ouverte » + Annuler ; état d'échec avec
-  « Reprendre » (même checkpoint) et « Abandonner ».
-- `ScanStore` : suppression de `Images/` et `Checkpoint/` après succès
-  (D1), conservation en cas d'échec.
+- `Features/Reconstruction/Reconstructor.swift` — `@MainActor @Observable`,
+  unique propriétaire de la `PhotogrammetrySession` :
+  `lancer(images:checkpoint:modele:)` (checkpoint nil en mode plateau,
+  requête `.modelFile(url:)` au détail `.reduced` par défaut), boucle
+  `for try await` sur `outputs` → événements `progression / info / terminee /
+  echec / annulee`, journalisation des photos invalides ou sautées, du
+  sous-échantillonnage et du raccord incomplet ; messages français pour
+  `PhotogrammetrySession.Error` ; `annuler()` = `cancel()` + attente ≤ 3 s
+  de `!isProcessing`. Doublure simulateur dans le même fichier (`#else`).
+- `Features/Reconstruction/ReconstructionView.swift` — titre, bilan des
+  photos, barre + pourcentage, étape en cours, temps restant, consigne
+  « Gardez l'app ouverte » ; `accessibilityValue` en phrase.
+- `Features/Scan/ScanFlowModel.swift` — enchaîne capture → reconstruction
+  (veille toujours désactivée), `reprendreReconstruction()` (supprime un
+  modèle partiel puis relance avec le même checkpoint), D1 après succès
+  (`nettoyerApresReconstruction`), `annulationEnCours` qui ignore les
+  événements tardifs, confirmation d'annulation aussi quand une reprise est
+  possible, `scanTermine`.
+- `Features/Scan/ScanFlowView.swift` — `ReconstructionView`,
+  `ApercuPlaceholderView`, `EchecView` avec « Reprendre » ; en fin de scan la
+  barre affiche **« Fermer » (garde le modèle)** au lieu d'« Annuler »
+  (supprimait tout).
+- `Features/Scan/EchecView.swift` — « Reprendre la reconstruction » +
+  « Abandonner » si reprise possible, sinon « Fermer ».
+- `Features/Scan/ApercuPlaceholderView.swift` — écran 7 provisoire
+  (remplace `ReconstructionPlaceholderView`).
+- `Features/Scan/ScanStore.swift` — `nettoyerApresReconstruction`,
+  `supprimerFichier`, `tailleFichier`.
+- `App/Journal.swift` — `Logger.reconstruction`.
 
-Risques : incertitude 4 (verrouillage) — **l'étape qui tranche D2** ;
-mémoire (session de capture déjà libérée).
-Sécurité : D2 réévaluée ; suppression des photos ; `insufficientStorage`
-affiché avec la taille manquante.
-Accessibilité : progression exposée via `accessibilityValue`
-(« 42 pour cent »), annonce à la fin.
+Risques restants : incertitude 4 (verrouillage) — **à trancher par le
+test (2) ci-dessous** ; incertitude 8 (qualité en mode plateau) ; les
+modèles terminés s'accumulent dans `Scans/` (~10 Mo chacun) sans moyen de
+les supprimer avant la bibliothèque de la tranche 2 (désinstaller l'app les
+efface).
+Sécurité : D1 appliquée (photos et checkpoint supprimés après succès,
+conservés en cas d'échec pour la reprise) ; D2 inchangée en attendant le
+test ; erreurs et chemins en `.private`, compteurs en `.public`.
+Accessibilité : barre de progression lue « 42 pour cent, environ 2 minutes
+restantes » ; icône décorative masquée ; boutons `.controlSize(.large)`.
 
-Test iPhone : (1) reconstruction complète, progression qui avance, arrivée
-sur Aperçu ; (2) **verrouiller l'iPhone au milieu** → déverrouiller → noter :
-reprise transparente, ou échec + « Reprendre » fonctionne ; (3) Annuler →
-Accueil, dossier supprimé ; (4) Réglages → Général → Stockage iPhone : l'app
-ne grossit pas après un scan réussi.
+Test iPhone : (1) scan en orbite → reconstruction : bilan des photos, barre
+qui avance, étape qui change, temps restant → « Modèle prêt (X Mo) » →
+Fermer ; Console : « Modèle écrit : N octets », « photos et checkpoint
+supprimés ». (2) **Verrouiller l'iPhone au milieu**, attendre 30 s,
+déverrouiller : noter si la reconstruction reprend seule, ou échoue et
+« Reprendre » aboutit (message d'erreur exact dans la console Xcode).
+(3) Annuler pendant la reconstruction → confirmation → Accueil, « Scan
+<UUID> supprimé ». (4) Même scan en mode plateau → le modèle est-il
+cohérent ? (qualité jugée à l'étape 4 ; ici, simple réussite ou échec).
 
 ### Étape 4 — Aperçu et dimensions
 

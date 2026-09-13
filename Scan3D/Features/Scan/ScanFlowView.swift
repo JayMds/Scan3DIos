@@ -17,7 +17,12 @@ struct ScanFlowView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Annuler") { demanderAnnulation() }
+                        if model.scanTermine {
+                            // Le modèle reste dans Scans/<UUID>/ (bibliothèque en tranche 2).
+                            Button("Fermer") { dismiss() }
+                        } else {
+                            Button("Annuler") { demanderAnnulation() }
+                        }
                     }
                 }
                 .confirmationDialog(
@@ -29,7 +34,9 @@ struct ScanFlowView: View {
                         Task { await annuler() }
                     }
                 } message: {
-                    Text("Les photos déjà prises seront supprimées.")
+                    Text(model.reprisePossible
+                         ? "Les photos seront supprimées : la reconstruction ne pourra plus être reprise."
+                         : "Les photos déjà prises seront supprimées.")
                 }
                 .alert("Impossible de démarrer", isPresented: erreurPresente, presenting: model.erreur) { _ in
                     Button("OK") {}
@@ -68,20 +75,24 @@ struct ScanFlowView: View {
                     ProgressView()
                 }
             case .reconstruction:
-                ReconstructionPlaceholderView(bilan: model.bilanCapture)
+                ReconstructionView(model: model)
             case .preview:
-                // Écran livré par l'étape 4 du plan.
-                ContentUnavailableView(
-                    "Étape à venir",
-                    systemImage: "hammer",
-                    description: Text("L'aperçu du modèle arrive à l'étape 4.")
-                )
+                // Le modèle reste dans Scans/<UUID>/ pour la bibliothèque (tranche 2).
+                ApercuPlaceholderView(tailleModele: model.tailleModele) {
+                    dismiss()
+                }
             case .failed(let message):
-                EchecView(message: message) {
+                EchecView(message: message, reprendre: reprise) {
                     Task { await annuler() }
                 }
             }
         }
+    }
+
+    /// « Reprendre » n'a de sens qu'après un échec de reconstruction.
+    private var reprise: (() -> Void)? {
+        guard model.reprisePossible else { return nil }
+        return { Task { await model.reprendreReconstruction() } }
     }
 
     private var titre: String {

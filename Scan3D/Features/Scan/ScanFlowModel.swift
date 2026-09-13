@@ -31,6 +31,19 @@ final class ScanFlowModel {
     private(set) var capture: CaptureController?
     /// « 214 photos, 830 Mo » une fois la capture terminée.
     private(set) var bilanCapture: String?
+    /// Présent pendant la reconstruction ; nil ensuite (mémoire).
+    private(set) var reconstructor: Reconstructor?
+    private(set) var progression: Double = 0
+    private(set) var tempsRestant: TimeInterval?
+    private(set) var etapeReconstruction: String?
+    /// « 9,8 Mo » une fois le modèle écrit.
+    private(set) var tailleModele: String?
+    /// Vrai si l'échec vient de la reconstruction : les photos sont encore
+    /// là, on peut relancer (le checkpoint accélère la reprise).
+    private(set) var reprisePossible = false
+    /// Pendant `annuler()`, les derniers événements des sessions sont ignorés
+    /// (sinon un échec provoqué par l'arrêt s'afficherait avant la fermeture).
+    private var annulationEnCours = false
     /// Mode plateau : `numberOfShotsTaken` est cumulé sur toutes les passes,
     /// on retient le compteur au début du tour pour afficher « n / 36 ».
     private(set) var photosAuDebutDuTour = 0
@@ -44,8 +57,15 @@ final class ScanFlowModel {
         self.store = store
     }
 
+    /// Vrai aussi après un échec de reconstruction : annuler effacerait les
+    /// photos, donc toute possibilité de reprendre.
     var annulationDemandeConfirmation: Bool {
-        phase.cancellationNeedsConfirmation
+        phase.cancellationNeedsConfirmation || reprisePossible
+    }
+
+    /// Le scan est terminé : quitter garde le modèle au lieu de le supprimer.
+    var scanTermine: Bool {
+        if case .preview = phase { true } else { false }
     }
 
     var photosCeTour: Int {
@@ -159,6 +179,7 @@ final class ScanFlowModel {
     }
 
     private func traiter(_ evenement: CaptureController.Evenement) {
+        guard !annulationEnCours else { return }
         switch evenement {
         case .captureCommencee:
             // Seule la première entrée en .capturing change de phase ; les
@@ -168,9 +189,9 @@ final class ScanFlowModel {
             if phase == .capture { transiter(vers: .passComplete) }
         case .terminee:
             capture = nil
-            VeilleEcran.empecher(false)
             transiter(vers: .reconstruction(progress: 0))
             Task { await mesurerCapture() }
+            lancerReconstruction()
         case .echec(let message):
             capture = nil
             VeilleEcran.empecher(false)
@@ -187,6 +208,79 @@ final class ScanFlowModel {
         Logger.scan.info("Capture terminée : \(taille.fichiers, privacy: .public) fichiers, \(taille.octets, privacy: .public) octets")
     }
 
+    // MARK: Reconstruction (écran 6)
+
+    /// Relance après un échec de reconstruction, avec le même checkpoint.
+    func reprendreReconstruction() async {
+        guard case .failed = phase, reprisePossible, let layout else { return }
+        reprisePossible = false
+        // Un modèle partiel pourrait gêner l'écriture (comportement non
+        // documenté par Apple) : on repart d'un emplacement propre.
+        do {
+            try await store.supprimerFichier(layout.modelFile)
+        } catch {
+            Logger.stockage.error("Modèle partiel non supprimé : \(error.localizedDescription, privacy: .private)")
+        }
+        transiter(vers: .reconstruction(progress: 0))
+        lancerReconstruction()
+    }
+
+    private func lancerReconstruction() {
+        guard let layout else { return }
+        progression = 0
+        tempsRestant = nil
+        etapeReconstruction = nil
+        let reconstructor = Reconstructor { [weak self] evenement in
+            self?.traiterReconstruction(evenement)
+        }
+        self.reconstructor = reconstructor
+        // La veille reste désactivée (elle l'était déjà pendant la capture).
+        VeilleEcran.empecher(true)
+        reconstructor.lancer(
+            images: layout.imagesDirectory,
+            checkpoint: mode.usesCheckpoint ? layout.checkpointDirectory : nil,
+            modele: layout.modelFile
+        )
+    }
+
+    private func traiterReconstruction(_ evenement: Reconstructor.Evenement) {
+        guard !annulationEnCours else { return }
+        switch evenement {
+        case .progression(let fraction):
+            progression = fraction
+            transiter(vers: .reconstruction(progress: fraction))
+        case .info(let tempsRestant, let etape):
+            self.tempsRestant = tempsRestant
+            etapeReconstruction = etape
+        case .terminee(let modele):
+            reconstructor = nil
+            VeilleEcran.empecher(false)
+            transiter(vers: .preview(model: modele))
+            Task { await finaliserModele(modele) }
+        case .echec(let message):
+            reconstructor = nil
+            VeilleEcran.empecher(false)
+            reprisePossible = true
+            transiter(vers: .failed(message: message))
+        case .annulee:
+            // Piloté par annuler(), qui libère et supprime.
+            break
+        }
+    }
+
+    /// D1 : le modèle est là, les photos ne servent plus sur l'iPhone.
+    private func finaliserModele(_ modele: URL) async {
+        guard let layout else { return }
+        let octets = await store.tailleFichier(modele)
+        tailleModele = ByteCountFormatter.string(fromByteCount: octets, countStyle: .file)
+        Logger.reconstruction.info("Modèle écrit : \(octets, privacy: .public) octets")
+        do {
+            try await store.nettoyerApresReconstruction(layout)
+        } catch {
+            Logger.stockage.error("Nettoyage après reconstruction impossible : \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
     /// Transition journalisée : un refus est un bug de séquencement, pas une
     /// erreur utilisateur — on ne casse pas l'app pour ça.
     private func transiter(vers cible: ScanPhase) {
@@ -199,11 +293,18 @@ final class ScanFlowModel {
 
     // MARK: Sortie
 
-    /// Arrête la session, puis supprime le dossier du scan (photos comprises).
+    /// Arrête la session en cours (capture ou reconstruction), puis supprime
+    /// le dossier du scan, photos comprises.
     func annuler() async {
+        annulationEnCours = true
+        defer { annulationEnCours = false }
         if let capture {
             await capture.annuler()
             self.capture = nil
+        }
+        if let reconstructor {
+            await reconstructor.annuler()
+            self.reconstructor = nil
         }
         VeilleEcran.empecher(false)
         guard let layout else { return }

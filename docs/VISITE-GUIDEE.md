@@ -334,6 +334,23 @@ sous `#if targetEnvironment(simulator)`, même interface que les vrais types.
 - Vues « feuilles » avec closure en paramètre (`let fermer: () -> Void`)
   ≈ prop callback.
 
+### `Packages/Scan3DCore/Sources/Scan3DCore/Capture/CaptureMode.swift` (étape 2 bis)
+
+**Rôle** : `orbit` / `turntable` et ce qui en découle (capture automatique,
+checkpoint, objectif de 36 photos par tour).
+
+- Enum à valeur brute `String` : rend le type utilisable tel quel avec
+  `@AppStorage` (préférence dans `UserDefaults`).
+- `static let` dérivée d'une autre (`360 / turntableShotsPerTurn`) ; fonction
+  pure bornée par `min` / `max`.
+
+### `Scan3D/Features/Scan/PreparationView.swift` (modifié à l'étape 2 bis)
+
+- `@AppStorage("modeCapture") var mode: CaptureMode` : lecture/écriture
+  automatique d'une préférence, comme `useState` branché sur `AsyncStorage`.
+- `Picker` segmenté + `ForEach(CaptureMode.allCases)` + `.tag(mode)`.
+- Liste de conseils calculée par `Conseil.pour(mode)`.
+
 ### Modifiés à l'étape 2
 
 - `ScanFlowModel.swift` — événements du contrôleur → transitions, mesure des

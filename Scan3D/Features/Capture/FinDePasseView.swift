@@ -18,12 +18,16 @@ struct FinDePasseView: View {
             VStack(spacing: 12) {
                 Text("\(controller.nombrePhotos) photos prises")
                     .font(.headline)
-                Text("Une passe à une autre hauteur, ou l'objet retourné, complète les parties cachées.")
+                Text(model.mode == .turntable
+                     ? "Un tour de plus avec l'iPhone plus haut ou plus bas, ou l'objet retourné, complète les parties cachées."
+                     : "Une passe à une autre hauteur, ou l'objet retourné, complète les parties cachées.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Button("Nouvelle passe à une autre hauteur") { model.nouvellePasse() }
-                    .buttonStyle(.bordered)
+                Button(model.mode == .turntable ? "Nouveau tour à une autre hauteur" : "Nouvelle passe à une autre hauteur") {
+                    model.nouvellePasse()
+                }
+                .buttonStyle(.bordered)
                 if controller.objetRetournable {
                     Button("Retourner l'objet, puis continuer") { model.nouvellePasseApresRetournement() }
                         .buttonStyle(.bordered)

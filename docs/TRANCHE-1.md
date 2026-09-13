@@ -28,6 +28,10 @@ Principes UX :
   réelle, jamais un simple spinner.
 - **Les dimensions d'abord** : dans l'aperçu, la cote en mm est l'information
   principale — c'est elle qui intéresse un utilisateur d'imprimante 3D.
+- **Deux façons de capturer** (ajout du 13/09/2026) : tourner autour de
+  l'objet (capture automatique) ou poser l'iPhone et tourner l'objet sur un
+  plateau (photos déclenchées à la main, 36 par tour). Voir
+  `TRANCHE-1-PLAN.md`, étape 2 bis.
 
 ## 2. Spécification technique
 

@@ -75,14 +75,9 @@ struct CaptureView: View {
                         .buttonStyle(.borderedProminent)
                 }
             case .capturing:
-                Text("\(controller.nombrePhotos) / \(controller.maximumPhotos) photos")
-                    .font(.headline.monospacedDigit())
-                    .accessibilityLabel("\(controller.nombrePhotos) photos prises sur \(controller.maximumPhotos)")
-                Text("Tournez lentement autour de l'objet jusqu'à remplir le cadran.")
-                if controller.nombrePhotos >= Self.minimumPhotosPourTerminer {
-                    // Secours si le tour complet est impossible (objet contre un mur…).
-                    Button("Terminer sans finir le tour") { model.terminerCapture() }
-                        .buttonStyle(.bordered)
+                switch model.mode {
+                case .orbit: commandesOrbite
+                case .turntable: commandesPlateau
                 }
             case .finishing:
                 ProgressView("Enregistrement des photos…")
@@ -98,6 +93,49 @@ struct CaptureView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
+    }
+
+    /// Mode orbite : RealityKit prend les photos, on montre l'avancement.
+    @ViewBuilder
+    private var commandesOrbite: some View {
+        Text("\(controller.nombrePhotos) / \(controller.maximumPhotos) photos")
+            .font(.headline.monospacedDigit())
+            .accessibilityLabel("\(controller.nombrePhotos) photos prises sur \(controller.maximumPhotos)")
+        Text("Tournez lentement autour de l'objet jusqu'à remplir le cadran.")
+        if controller.nombrePhotos >= Self.minimumPhotosPourTerminer {
+            // Secours si le tour complet est impossible (objet contre un mur…).
+            Button("Terminer sans finir le tour") { model.terminerCapture() }
+                .buttonStyle(.bordered)
+        }
+    }
+
+    /// Mode plateau : l'utilisateur déclenche chaque photo et déclare le tour fini.
+    @ViewBuilder
+    private var commandesPlateau: some View {
+        let photos = model.photosCeTour
+        ProgressView(value: CaptureMode.turntableTurnProgress(shotsThisTurn: photos)) {
+            Text("\(photos) / \(CaptureMode.turntableShotsPerTurn) photos ce tour")
+                .font(.headline.monospacedDigit())
+        }
+        .accessibilityLabel("\(photos) photos sur \(CaptureMode.turntableShotsPerTurn) pour ce tour")
+        Text("Tournez le plateau d'environ \(CaptureMode.turntableDegreesPerShot)°, puis prenez une photo.")
+        HStack {
+            Button("Tour terminé") { model.terminerTour() }
+                .buttonStyle(.bordered)
+                .disabled(photos < CaptureMode.turntableMinimumShotsPerTurn)
+            Button {
+                model.prendrePhoto()
+            } label: {
+                Label("Photo", systemImage: "camera.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!controller.photoPossible)
+        }
+        // Retour non visuel à chaque photo prise (VoiceOver n'a pas le compteur sous les yeux).
+        .onChange(of: controller.nombrePhotos) { _, _ in
+            AccessibilityNotification.Announcement("\(model.photosCeTour) photos").post()
+        }
     }
 }
 #endif

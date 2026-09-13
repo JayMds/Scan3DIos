@@ -29,12 +29,14 @@ final class CaptureController {
 
     private(set) var session: ObjectCaptureSession?
     private let layout: ScanLayout
+    private let mode: CaptureMode
     private let onEvenement: @MainActor (Evenement) -> Void
     private var surveillances: [Task<Void, Never>] = []
     private var annule = false
 
-    init(layout: ScanLayout, onEvenement: @escaping @MainActor (Evenement) -> Void) {
+    init(layout: ScanLayout, mode: CaptureMode, onEvenement: @escaping @MainActor (Evenement) -> Void) {
         self.layout = layout
+        self.mode = mode
         self.onEvenement = onEvenement
     }
 
@@ -42,6 +44,8 @@ final class CaptureController {
 
     var nombrePhotos: Int { session?.numberOfShotsTaken ?? 0 }
     var maximumPhotos: Int { session?.maximumNumberOfInputImages ?? 0 }
+    /// Faux hors de `.capturing` ou quand la session est occupée (photo en cours).
+    var photoPossible: Bool { session?.canRequestImageCapture ?? false }
 
     /// Le conseil le plus urgent parmi les retours actifs de la session.
     var conseil: CaptureHint? {
@@ -62,9 +66,13 @@ final class CaptureController {
         let session = ObjectCaptureSession()
         var configuration = ObjectCaptureSession.Configuration()
         // Doit être un dossier VIDE, sinon la session passe en .failed (doc Apple).
-        configuration.checkpointDirectory = layout.checkpointDirectory
+        // Sur plateau, les poses du checkpoint seraient toutes identiques : on
+        // ne l'écrit même pas.
+        configuration.checkpointDirectory = mode.usesCheckpoint ? layout.checkpointDirectory : nil
         // Tranche 1 : reconstruction sur l'iPhone, inutile de dépasser sa limite.
         configuration.isOverCaptureEnabled = false
+        // Sur plateau, l'iPhone ne bouge pas : c'est l'utilisateur qui déclenche.
+        session.isAutoCaptureEnabled = mode.usesAutomaticCapture
         session.start(imagesDirectory: layout.imagesDirectory, configuration: configuration)
         self.session = session
         surveiller(session)
@@ -75,6 +83,8 @@ final class CaptureController {
     func commencerDetection() -> Bool { session?.startDetecting() ?? false }
     func reinitialiserDetection() { _ = session?.resetDetection() }
     func commencerCapture() { session?.startCapturing() }
+    /// Mode plateau : une photo à la demande (avec profondeur, comme en automatique).
+    func prendrePhoto() { session?.requestImageCapture() }
     func nouvellePasse() { session?.beginNewScanPass() }
     func nouvellePasseApresRetournement() { session?.beginNewScanPassAfterFlip() }
     func terminer() { session?.finish() }

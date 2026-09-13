@@ -303,6 +303,66 @@ Annuler → confirmation → Accueil, « Scan <UUID> supprimé ». Puis : Annule
 pleine capture → confirmation → l'écran se remet en veille après le délai
 réglé.
 
+### Étape 2 bis — Mode plateau tournant ✅ (13/09/2026, hors plan initial)
+
+Demande de Jinkuro après le test de l'étape 2 : tourner autour de l'objet
+est peu pratique, il possède un plateau rotatif **manuel**. Options
+présentées : A) mode plateau dans la session actuelle, B) capture maison
+AVFoundation + LiDAR (comme l'exemple Apple de 2021), C) import de photos
+(rejeté : pas de profondeur donc pas d'échelle). **Retenu : A**, B en repli
+si la reconstruction déçoit.
+
+Principe : même `ObjectCaptureSession` (viseur, boîte englobante, photos
+avec profondeur = échelle réelle) mais `isAutoCaptureEnabled = false`,
+photos déclenchées par `requestImageCapture()`, et **pas de checkpoint**
+(les poses ARKit d'un iPhone immobile sont identiques). Un objet qui tourne
+devant une caméra fixe équivaut à une caméra qui orbite, à condition d'un
+fond uni (fixe) et d'une lumière diffuse. **Cas non documenté par Apple** :
+la validation se fait par la qualité des reconstructions à l'étape 3.
+
+Core :
+- `Capture/CaptureMode.swift` — `orbit` / `turntable`, `usesAutomaticCapture`,
+  `usesCheckpoint`, objectif 36 photos par tour (10°), minimum 12 pour
+  « Tour terminé », `turntableTurnProgress(shotsThisTurn:)`. Tests :
+  `CaptureModeTests.swift` (4 tests).
+
+App :
+- `Features/Scan/PreparationView.swift` — sélecteur segmenté du mode
+  (préférence `@AppStorage("modeCapture")`), conseils spécifiques au plateau
+  (iPhone sur support, fond uni derrière le plateau).
+- `Features/Capture/CaptureMode+Texte.swift` — titres et explications.
+- `Features/Capture/CaptureController.swift` — `mode` ; `checkpointDirectory`
+  seulement si `usesCheckpoint` ; `isAutoCaptureEnabled` ; `photoPossible`
+  (`canRequestImageCapture`) ; `prendrePhoto()`.
+- `Features/Capture/CaptureView.swift` — en `.capturing`, commandes selon le
+  mode : plateau = barre « n / 36 photos ce tour », bouton **Photo**,
+  « Tour terminé » (dès 12 photos), annonce VoiceOver du compteur.
+- `Features/Capture/FinDePasseView.swift` — libellés adaptés (« Nouveau
+  tour à une autre hauteur »).
+- `Features/Scan/ScanFlowModel.swift` — `mode`, `demarrer(mode:)`,
+  `prendrePhoto()`, `terminerTour()` (c'est l'utilisateur qui déclare le
+  tour fini, RealityKit ne le saura jamais), `photosCeTour` (compteur
+  cumulé − compteur au début du tour).
+
+**Conséquence pour l'étape 3** : `PhotogrammetrySession.Configuration`
+reçoit `checkpointDirectory` seulement si `mode.usesCheckpoint`.
+
+Incertitudes ajoutées : (8) qualité de reconstruction en mode plateau ;
+(9) `ObjectCapturePointCloudView` avec une caméra fixe peut afficher un
+nuage incohérent — à masquer en mode plateau si c'est le cas ; (10) la
+boîte englobante peut décrocher quand l'objet tourne (ARKit voit un objet
+mobile dans une scène fixe).
+
+Test iPhone : Préparation → « Plateau tournant » (les conseils changent) →
+Commencer → poser l'iPhone sur un support, cadrer le plateau → Continuer →
+boîte serrée sur le plateau → Commencer la capture → titre Capture : barre
+« 0 / 36 photos ce tour », bouton Photo → tourner ~10°, Photo, répéter (le
+compteur monte, VoiceOver annonce « n photos ») → « Tour terminé » actif à
+partir de 12 → Passe terminée → « Nouveau tour à une autre hauteur » :
+surélever l'iPhone, refaire un tour → Terminer et reconstruire → bilan
+« N photos, X Mo ». Vérifier : la boîte reste sur l'objet pendant la
+rotation ; le bouton Photo se réactive après chaque photo.
+
 ### Étape 3 — Reconstruction sur l'iPhone
 
 Objectif : `Images/` → `modele.usdz` avec progression réelle, annulation,

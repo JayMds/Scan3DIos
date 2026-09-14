@@ -76,9 +76,9 @@ struct ScanFlowView: View {
                 }
             case .reconstruction:
                 ReconstructionView(model: model)
-            case .preview:
+            case .preview(let modele):
                 // Le modèle reste dans Scans/<UUID>/ pour la bibliothèque (tranche 2).
-                ApercuPlaceholderView(tailleModele: model.tailleModele) {
+                ApercuView(model: model, modele: modele) {
                     dismiss()
                 }
             case .failed(let message):

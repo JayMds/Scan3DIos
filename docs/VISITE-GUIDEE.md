@@ -386,10 +386,12 @@ l'annule, et traduit ses sorties en événements.
 - `.accessibilityValue` pour la phrase, `.accessibilityHidden(true)` pour ne
   pas lire deux fois la même information.
 
-### `Scan3D/Features/Scan/EchecView.swift` et `ApercuPlaceholderView.swift` (étape 3)
+### `Scan3D/Features/Scan/EchecView.swift` (modifié à l'étape 3)
 
 - Paramètre optionnel de type fonction avec valeur par défaut
   `var reprendre: (() -> Void)? = nil` ≈ prop callback facultative.
+  (L'`ApercuPlaceholderView` provisoire de l'étape 3 a été remplacé par
+  `ApercuView` à l'étape 4.)
 
 ### Modifiés à l'étape 3
 
@@ -399,6 +401,84 @@ l'annule, et traduit ses sorties en événements.
 - `ScanFlowView.swift` — bouton de barre conditionnel (« Fermer » / « Annuler »).
 - `ScanStore.swift` — boucle `for … where` pour ne supprimer que les
   dossiers présents.
+
+## Tranche 1 — étape 4 : aperçu et dimensions
+
+Ajoutés le 14/09/2026.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Mesh/Mesh.swift`
+
+**Rôle** : le maillage triangulaire validé une fois pour toutes (positions
+en mètres, indices, boîte englobante), avec un plafond de triangles.
+
+- `SIMD3<Float>` : vecteur 3D natif, avec `pointwiseMin` / `pointwiseMax`
+  (≈ `Math.min` composante par composante).
+- `init(...) throws(MeshError)` : **initialiseur qui peut échouer en levant
+  une erreur** — impossible d'obtenir un `Mesh` invalide.
+- Paramètre par défaut qui référence une constante du type
+  (`maximumTriangleCount: Int = Mesh.maximumTriangleCount`) : les tests
+  passent un petit plafond sans fabriquer des millions de triangles.
+- `allSatisfy` ≈ `Array.prototype.every`.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Mesh/MeshLoader.swift`
+
+**Rôle** : lit un fichier 3D avec Model I/O et le fusionne en un `Mesh`,
+transformations comprises, avec lecture bornée des tampons.
+
+- **Pointeurs bruts** : `dataStart.loadUnaligned(fromByteOffset:as:)` lit
+  un `Float` à un décalage donné (≈ `DataView.getFloat32` en JS).
+- `withExtendedLifetime(objet) { … }` : garantit que l'objet qui « mappe »
+  le tampon vit pendant la lecture (sans lui, le compilateur pourrait le
+  libérer avant la fin — un piège sans équivalent en JS).
+- `inout` : paramètre modifié en place (`dans positions: inout [...]`,
+  appelé avec `&positions`).
+- Closure à erreur typée : `{ () throws(MeshError) in … }`.
+- `UInt32(exactly:)` : conversion qui renvoie `nil` au lieu de déborder.
+- `NSErrorPointer` : `var erreur: NSError?` passé en `&erreur`, héritage
+  d'Objective-C quand une API n'est pas importée en `throws`.
+- `static func` **interne** (sans `public`) + `@testable import` : les
+  tests y accèdent, l'app non.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Mesh/Dimensions.swift`
+
+**Rôle** : cotes en mm (longueur ≥ largeur, hauteur selon Y), plausibilité,
+et textes pour l'écran et VoiceOver.
+
+- Deux initialiseurs, dont un qui **délègue** à l'autre (`self.init(...)`).
+- `max(a, b, c)` variadique ; `ClosedRange.contains`.
+- `FormatStyle` : `valeur.formatted(.number.precision(.fractionLength(1)).grouping(.never).locale(locale))`
+  ≈ `Intl.NumberFormat` avec options chaînées.
+
+### `MeshTests.swift` et `DimensionsTests.swift`
+
+- Fabrication d'assets Model I/O en mémoire (`MDLMesh(boxWithExtent:...)`,
+  `MDLObject`, `MDLTransform(matrix:)`) : les tests d'unités ne dépendent
+  d'aucun fichier ni d'aucun iPhone.
+- `defer { try? FileManager.default.removeItem(at:) }` pour nettoyer le
+  fichier temporaire de l'aller-retour USD.
+
+### `Scan3D/Features/Apercu/ApercuView.swift`
+
+**Rôle** : écran 7 — cotes en mm, avertissement si l'échelle paraît fausse,
+« Voir en 3D » (Quick Look) et « Terminer ».
+
+- `switch` sur un enum dans une `List` (états `enCours` / `reussie` /
+  `echec`) ≈ rendu conditionnel sur un état de requête (`isLoading` /
+  `data` / `error`).
+- `LabeledContent` : ligne « libellé — valeur » adaptée à Dynamic Type et
+  VoiceOver.
+- `.quickLookPreview($url)` piloté par un `@State` optionnel ;
+  `import QuickLook` obligatoire.
+- `.onChange(of:initial: true)` : réagit aussi à la valeur présente au
+  premier affichage (≈ `useEffect` avec la valeur initiale).
+
+### Modifiés à l'étape 4
+
+- `ScanFlowModel.swift` — enum imbriqué `MesureModele`, lecture dans
+  `Task.detached(priority: .userInitiated) { … }.value` : travail lourd hors
+  du fil principal, résultat `Sendable` rapporté sur le `@MainActor`.
+- `ScanFlowView.swift` — `case .preview(let modele)` : extraction de la
+  valeur associée directement dans le `switch`.
 
 ## Les fichiers non-Swift
 

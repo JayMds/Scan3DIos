@@ -23,6 +23,13 @@ enum ScanFlowError: LocalizedError {
 /// `@MainActor` : tout ce qu'il expose est lu par SwiftUI.
 @MainActor @Observable
 final class ScanFlowModel {
+    /// État de la mesure du modèle sur l'écran d'aperçu.
+    enum MesureModele: Equatable {
+        case enCours
+        case reussie(Dimensions, triangles: Int)
+        case echec
+    }
+
     private(set) var phase: ScanPhase = .preparation
     private(set) var autorisationCamera = CameraAuthorization.statut
     private(set) var layout: ScanLayout?
@@ -37,6 +44,7 @@ final class ScanFlowModel {
     private(set) var etapeReconstruction: String?
     /// « 9,8 Mo » une fois le modèle écrit.
     private(set) var tailleModele: String?
+    private(set) var mesure: MesureModele = .enCours
     /// Vrai si l'échec vient de la reconstruction : les photos sont encore
     /// là, on peut relancer (le checkpoint accélère la reprise).
     private(set) var reprisePossible = false
@@ -231,6 +239,7 @@ final class ScanFlowModel {
             reconstructor = nil
             VeilleEcran.empecher(false)
             transiter(vers: .preview(model: modele))
+            Task { await mesurerModele(modele) }
             Task { await finaliserModele(modele) }
         case .echec(let message):
             reconstructor = nil
@@ -240,6 +249,25 @@ final class ScanFlowModel {
         case .annulee:
             // Piloté par annuler(), qui libère et supprime.
             break
+        }
+    }
+
+    /// Lecture et mesure hors du fil principal : un modèle de 50 k triangles
+    /// se lit en une fraction de seconde, mais jamais au prix d'une interface figée.
+    private func mesurerModele(_ modele: URL) async {
+        mesure = .enCours
+        do {
+            let maillage = try await Task.detached(priority: .userInitiated) {
+                try MeshLoader.load(contentsOf: modele)
+            }.value
+            let dimensions = Dimensions(boundingBox: maillage.boundingBox)
+            mesure = .reussie(dimensions, triangles: maillage.triangleCount)
+            // Des cotes d'objet ne sont pas une donnée personnelle : publiques,
+            // utiles pour comparer au test à la règle.
+            Logger.reconstruction.info("Dimensions \(DimensionsFormatter.compact(dimensions), privacy: .public), \(maillage.triangleCount, privacy: .public) triangles, plausibles : \(dimensions.isPlausible, privacy: .public)")
+        } catch {
+            mesure = .echec
+            Logger.reconstruction.error("Mesure du modèle impossible : \(String(describing: error), privacy: .public)")
         }
     }
 

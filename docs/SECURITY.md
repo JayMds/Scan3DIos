@@ -21,7 +21,7 @@ traîne. On traite ces photos comme des données personnelles.
 | Fichier 3MF malveillant importé (**zip slip**) | 3 | Refuser tout chemin contenant `..` ou absolu lors de la décompression |
 | **Zip bomb** (fichier qui explose à la décompression) | 3 | Plafonner taille totale décompressée et nombre d'entrées |
 | XML piégé dans un 3MF (entités externes, XXE) | 3 | Désactiver la résolution d'entités externes du parseur |
-| Maillage géant (déni de service mémoire) | 3 | Plafonner le nombre de triangles accepté |
+| Maillage géant (déni de service mémoire) | 3 | Plafonner le nombre de triangles accepté — **en place** depuis la tranche 1 : `Mesh.maximumTriangleCount` (2 M), lecture bornée des tampons dans `MeshLoader` |
 | Appareil tiers sur le Wi-Fi qui intercepte ou injecte des scans | 4 | Appairage par code + TLS, clé épinglée après appairage |
 | Chaîne d'approvisionnement (dépendance compromise) | toutes | Versions épinglées, licence vérifiée, dépendances minimales |
 

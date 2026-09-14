@@ -102,7 +102,7 @@ cible iOS 18).
 
 | # | Incertitude | Mitigation |
 |---|-------------|------------|
-| 1 | Liste officielle des formats Model I/O non relue (page rendue en JS). Import USDZ par `MDLAsset` très probable (SceneKit, Quick Look) mais non re-vérifié. | Étape 4 : `MDLAsset.canImportFileExtension("usdz")` au runtime + spike de 10 min sur iPhone ; repli RealityKit `MeshResource.contents`. |
+| 1 | Liste officielle des formats Model I/O non relue (page rendue en JS). Import USDZ par `MDLAsset` très probable (SceneKit, Quick Look) mais non re-vérifié. | Étape 4 : `MDLAsset.canImportFileExtension("usdz")` au runtime + spike de 10 min sur iPhone ; repli RealityKit `MeshResource.contents`. **Levée le 14/09/2026 sur Mac** : import USDZ confirmé ; Model I/O ignore `metersPerUnit` et `upAxis`, n'applique pas les transformations parentes aux sommets, et le pas des sommets varie (12 ou 32 octets). Validation finale : test à la règle sur iPhone. |
 | 2 | Texte de E174.1 confirmé via des sources tierces citant Apple. | Xcode / App Store Connect valident le manifeste à l'upload. |
 | 3 | Valeur par défaut de `Configuration.isOverCaptureEnabled` non documentée. | Fixée explicitement à `false`. |
 | 4 | Comportement réel de la reconstruction quand l'iPhone se verrouille (données protégées + app suspendue). | Scénario n° 5 de `TRANCHE-1.md` §5, à l'étape 3 : décide de la protection définitive. **Levée le 14/09/2026 : reprise automatique, `.complete` confirmé.** |
@@ -465,38 +465,76 @@ Résultats (14/09/2026) : (1) reconstruction aboutie en mode orbite ;
 (2) **reprise automatique après verrouillage** → D2 confirmée ;
 (4) **mode plateau en échec** → voir étape 2 bis.
 
-### Étape 4 — Aperçu et dimensions
+### Étape 4 — Aperçu et dimensions ✅ (14/09/2026, en attente du test iPhone)
 
 Objectif : écran Aperçu avec L × l × h en mm comme information principale,
 et visualisation 3D (D3).
 
-Core :
-- `Mesh/Mesh.swift` — `struct Mesh: Sendable` (`positions: [SIMD3<Float>]`,
-  `indices: [UInt32]`), validation (indices dans les bornes, multiple de 3).
-- `Mesh/MeshLoader.swift` — `import ModelIO` : `MDLAsset(url:)` →
-  `childObjects(of: MDLMesh.self)` →
-  `vertexAttributeData(forAttributeNamed: MDLVertexAttributePosition, as: .float3)`
-  + `submesh.indexBuffer(asIndexType: .uInt32)` → `Mesh` (D4) ; transforms
-  parents composés.
-- `Mesh/Dimensions.swift` — boîte englobante en mètres → `Dimensions` en mm
-  via `Units` ; `DimensionsFormatter` : « 124,0 × 85,5 × 40,2 mm » et phrase
-  VoiceOver « 12,4 centimètres de large, … » (`MeasurementFormatter`).
-- Tests : cube `MDLMesh(boxWithExtent: [0.05, 0.05, 0.05])` → 50,0 mm sur
-  les trois axes ; mesh invalide refusé ; formatage FR.
+Levée de risque avant de coder (essai sur Mac, fichiers USD aux cotes
+connues) : `MDLAsset` importe USDZ/USDA/USDC ; il **ignore `metersPerUnit`
+et `upAxis`** (valeurs brutes) ; les transformations des nœuds parents se
+composent avec `MDLTransform.globalTransform(with:atTime:)` ; le maillage
+arrive triangulé ; le **pas entre sommets varie** (12 octets pour un USD,
+32 pour un cube généré en mémoire). L'initialiseur avec erreur n'est pas
+importé en `throws` (paramètre `error: &erreur`).
+
+Core (`Sources/Scan3DCore/Mesh/`) :
+- `Mesh.swift` — `struct Mesh: Equatable, Sendable` (`positions` en mètres,
+  `indices`, `boundingBox` calculée une fois), validation (vide, indices non
+  multiples de 3, indice hors bornes, coordonnée non finie) et **plafond de
+  2 millions de triangles** (déni de service mémoire, préparé pour les
+  imports de la tranche 3). `MeshError`, `BoundingBox`.
+- `MeshLoader.swift` — `import ModelIO` (hors API publique) :
+  `load(contentsOf:)` vérifie format et lisibilité, fusionne tous les
+  `MDLMesh` en appliquant leur transformation globale, lit positions et
+  indices **bornés par `bufferSize` / `length`**, refuse la géométrie non
+  triangulaire, arrêt précoce au plafond.
+- `Dimensions.swift` — `Dimensions` (longueur ≥ largeur à l'horizontale,
+  hauteur selon Y, via `Units`), `isPlausible` (plus grande cote entre 1 mm
+  et 5 m, sinon erreur d'unité probable) ; `DimensionsFormatter` :
+  « 124,0 mm », « 124,0 × 85,6 × 40,2 mm », phrase VoiceOver en centimètres
+  avec accord du pluriel.
+- Tests : `MeshTests.swift` (6 tests de validation + 6 de lecture : cube
+  0,05 m → 50 mm, transformation parente ×2, fusion de deux maillages,
+  aller-retour par un vrai fichier `.usda`, fichier absent, format inconnu),
+  `DimensionsTests.swift` (5 tests).
 
 App :
-- `Features/Apercu/ApercuView.swift` — dimensions en gros (Dynamic Type),
-  « Voir en 3D » → `.quickLookPreview($url)` (D3), « Exporter » (étape 5),
-  « Terminer ».
+- `Features/Apercu/ApercuView.swift` — `List` : cotes compactes en gros,
+  lignes Longueur / Largeur / Hauteur, avertissement si non plausibles,
+  pied de page (triangles, taille, « boîte englobante, contrôlez au pied à
+  coulisse ») ; « Voir en 3D » → `.quickLookPreview` (**`import QuickLook`**
+  requis) ; « Terminer » ; annonce VoiceOver des dimensions dès qu'elles sont
+  prêtes.
+- `Features/Scan/ScanFlowModel.swift` — `MesureModele` (`enCours`,
+  `reussie`, `echec`), `mesurerModele` dans un `Task.detached` à la fin de
+  la reconstruction, dimensions journalisées en public.
+- `Features/Scan/ScanFlowView.swift` — `.preview(let modele)` → `ApercuView`.
+- Supprimé : `ApercuPlaceholderView.swift`.
+- « Exporter » n'apparaît pas encore : il arrive avec l'étape 5 (pas de
+  bouton inactif dans l'interface).
 
-Risques : incertitude 1 (import USDZ par Model I/O) → spike en début
-d'étape, repli D4-b.
-Sécurité : aucune donnée nouvelle.
-Accessibilité : dimensions avec `accessibilityLabel` en phrase ; Quick Look
-accessible nativement.
+Risques restants : unités réelles du fichier Object Capture (supposées en
+mètres, **validées seulement par le test à la règle**) ; boîte englobante
+alignée sur les axes du modèle — si l'objet est tourné autour de la
+verticale dans le fichier, longueur et largeur sont surestimées (repli : un
+rectangle d'aire minimale dans `Scan3DCore`).
+Sécurité : lecture bornée des tampons, plafond de triangles, validation des
+indices ; aucune donnée nouvelle ne quitte l'appareil.
+Accessibilité : phrase complète pour les cotes compactes, valeur en
+centimètres sur chaque ligne, annonce à l'arrivée, Quick Look accessible
+nativement, boutons `.controlSize(.large)`.
 
-Test iPhone : mesurer la boîte à la règle ; écart de quelques mm attendu ;
-ouvrir la 3D, passer en AR : l'objet virtuel a la taille du vrai.
+Test iPhone : (1) boîte en carton : mesurer ses trois cotes à la règle et
+les noter → scanner autour → reconstruction → écran Aperçu : « Mesure du
+modèle… » puis les cotes ; comparer à la règle (écart attendu de quelques
+mm ; noter les deux séries) ; Console : « Dimensions … mm, N triangles,
+plausibles : true ». (2) « Voir en 3D » : faire tourner le modèle, puis
+passer en mode AR (« AR » en haut) et poser le modèle à côté de la vraie
+boîte : même taille. (3) VoiceOver activé : à l'arrivée sur l'écran,
+entendre « Modèle prêt : … centimètres de long… ». (4) Plus grande taille de
+texte (Réglages → Accessibilité) : les cotes restent lisibles, rien n'est
+tronqué.
 
 ### Étape 5 — Export STL en millimètres
 

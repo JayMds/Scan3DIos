@@ -105,7 +105,7 @@ cible iOS 18).
 | 1 | Liste officielle des formats Model I/O non relue (page rendue en JS). Import USDZ par `MDLAsset` très probable (SceneKit, Quick Look) mais non re-vérifié. | Étape 4 : `MDLAsset.canImportFileExtension("usdz")` au runtime + spike de 10 min sur iPhone ; repli RealityKit `MeshResource.contents`. |
 | 2 | Texte de E174.1 confirmé via des sources tierces citant Apple. | Xcode / App Store Connect valident le manifeste à l'upload. |
 | 3 | Valeur par défaut de `Configuration.isOverCaptureEnabled` non documentée. | Fixée explicitement à `false`. |
-| 4 | Comportement réel de la reconstruction quand l'iPhone se verrouille (données protégées + app suspendue). | Scénario n° 5 de `TRANCHE-1.md` §5, à l'étape 3 : décide de la protection définitive. |
+| 4 | Comportement réel de la reconstruction quand l'iPhone se verrouille (données protégées + app suspendue). | Scénario n° 5 de `TRANCHE-1.md` §5, à l'étape 3 : décide de la protection définitive. **Levée le 14/09/2026 : reprise automatique, `.complete` confirmé.** |
 | 5 | Notes WWDC23 : session dans un `@StateObject` (bêta 2023) ; doc actuelle : `Observable`. | Suivre la doc : propriété d'une classe `@Observable`. Si l'UI ne se rafraîchit pas, consommer `stateUpdates`. |
 | 6 | Espace disque requis avant un scan : aucune valeur Apple. | Constante 2 Go dans `Scan3DCore`, ajustée après mesure de `Images/` (loggée à l'étape 2). |
 | 7 | Swift 6 strict : `PhotogrammetrySession` n'est pas `Sendable`, `Output` embarque `any Error`. | Créer **et** consommer la session dans le même contexte (`@MainActor`) ; le calcul lourd tourne dans les threads internes de RealityKit. |
@@ -347,6 +347,24 @@ App :
 **Conséquence pour l'étape 3** : `PhotogrammetrySession.Configuration`
 reçoit `checkpointDirectory` seulement si `mode.usesCheckpoint`.
 
+**Résultat du test terrain (14/09/2026) : échec.** Nuage de points
+incohérent en fin de tour, reconstruction en échec. Incertitudes 8 et 9
+confirmées : l'option A ne fonctionne pas.
+
+Explication la plus probable : `ObjectCaptureSession` enregistre avec les
+photos un nuage de points LiDAR placé dans le repère du monde (ARKit).
+L'iPhone étant fixe et l'objet tournant, les points de l'objet s'étalent en
+traînée (ce que montre l'aperçu), et la reconstruction s'appuie sur ces
+données. Le mode plateau **documenté par Apple** (« Capturing photographs
+for RealityKit Object Capture ») repose au contraire sur des photos simples
+— avec profondeur pour l'échelle réelle — devant un fond uni, sans données
+ARKit ; la même page indique que la création d'objets accepte les images de
+« n'importe quel appareil photo » sur iOS 17+ et macOS 12+.
+
+Suite : décision en attente (option B en tête, voir la conversation du
+14/09/2026). En attendant, le mode plateau reste sélectionnable mais ne
+produit pas de modèle.
+
 Incertitudes ajoutées : (8) qualité de reconstruction en mode plateau ;
 (9) `ObjectCapturePointCloudView` avec une caméra fixe peut afficher un
 nuage incohérent — à masquer en mode plateau si c'est le cas ; (10) la
@@ -363,7 +381,7 @@ surélever l'iPhone, refaire un tour → Terminer et reconstruire → bilan
 « N photos, X Mo ». Vérifier : la boîte reste sur l'objet pendant la
 rotation ; le bouton Photo se réactive après chaque photo.
 
-### Étape 3 — Reconstruction sur l'iPhone ✅ (14/09/2026, en attente du test iPhone)
+### Étape 3 — Reconstruction sur l'iPhone ✅ (14/09/2026)
 
 Objectif : `Images/` → `modele.usdz` avec progression réelle, annulation,
 reprise, nettoyage (D1). Traite les deux modes de capture.
@@ -433,6 +451,10 @@ déverrouiller : noter si la reconstruction reprend seule, ou échoue et
 (3) Annuler pendant la reconstruction → confirmation → Accueil, « Scan
 <UUID> supprimé ». (4) Même scan en mode plateau → le modèle est-il
 cohérent ? (qualité jugée à l'étape 4 ; ici, simple réussite ou échec).
+
+Résultats (14/09/2026) : (1) reconstruction aboutie en mode orbite ;
+(2) **reprise automatique après verrouillage** → D2 confirmée ;
+(4) **mode plateau en échec** → voir étape 2 bis.
 
 ### Étape 4 — Aperçu et dimensions
 

@@ -46,6 +46,12 @@ checkpoint, quelques secondes). Règle de bascule : si le scénario
 échoue trop souvent, passer à `.completeUnlessOpen` et consigner ici le
 résultat mesuré.
 
+**Test terrain (14/09/2026, iPhone réel, mode orbite)** : iPhone verrouillé
+pendant la reconstruction, 30 s d'attente, déverrouillage → la
+reconstruction **reprend seule**, sans erreur ni reprise manuelle.
+`.complete` est confirmé ; pas de bascule. Le bouton « Reprendre » reste
+utile pour les autres causes d'échec.
+
 ## Checklist App Store
 
 - [ ] `NSCameraUsageDescription` claire et honnête (en place).

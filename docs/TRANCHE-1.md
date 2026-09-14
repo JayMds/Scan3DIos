@@ -124,8 +124,9 @@ Options étudiées et plan d'étapes : `TRANCHE-1-PLAN.md`.
       après un succès, conservées en cas d'échec pour réessayer. Une
       préférence opt-in « conserver pour le Mac » arrivera en tranche 4.
 - [x] Protection des fichiers de scan : **`.complete`**, avec un bouton
-      « Reprendre » qui repart du checkpoint. Le scénario de test n° 5 décide
-      d'une bascule vers `.completeUnlessOpen` (voir `SECURITY.md`).
+      « Reprendre » qui repart du checkpoint. Confirmé par le scénario n° 5
+      le 14/09/2026 : la reconstruction reprend seule après verrouillage
+      (voir `SECURITY.md`).
 - [x] Aperçu 3D : **Quick Look** (`.quickLookPreview`), les dimensions en mm
       restant l'information principale de l'écran. `RealityView` viendra avec
       l'outil de mesure (tranche 2).

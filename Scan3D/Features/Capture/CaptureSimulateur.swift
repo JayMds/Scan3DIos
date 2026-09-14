@@ -20,11 +20,10 @@ final class CaptureController {
 
     var nombrePhotos: Int { 0 }
     var maximumPhotos: Int { 0 }
-    var photoPossible: Bool { false }
     var conseil: CaptureHint? { nil }
     var objetRetournable: Bool { false }
 
-    init(layout: ScanLayout, mode: CaptureMode, onEvenement: @escaping @MainActor (Evenement) -> Void) {
+    init(layout: ScanLayout, onEvenement: @escaping @MainActor (Evenement) -> Void) {
         self.onEvenement = onEvenement
     }
 
@@ -35,7 +34,6 @@ final class CaptureController {
     func commencerDetection() -> Bool { false }
     func reinitialiserDetection() {}
     func commencerCapture() {}
-    func prendrePhoto() {}
     func nouvellePasse() {}
     func nouvellePasseApresRetournement() {}
     func terminer() {}

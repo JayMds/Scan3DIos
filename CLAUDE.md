@@ -100,6 +100,10 @@ terminée si l'une des deux échoue.
   `ObjectCaptureSession.isSupported` et afficher un écran explicite sinon.
 - **Une seule session de capture** active à la fois ; la libérer
   explicitement quand on quitte l'écran (mémoire importante).
+- **Plateau tournant incompatible avec `ObjectCaptureSession`** (testé le
+  14/09/2026) : iPhone fixe + objet qui tourne → nuage de points incohérent,
+  reconstruction en échec, même sans checkpoint ni capture automatique. Le
+  plateau passe par des photos simples avec profondeur (tranche 4).
 - **Cross-import overlay** : `ObjectCaptureSession`, `ObjectCaptureView` et
   `ObjectCapturePointCloudView` n'existent que dans un fichier qui importe
   **RealityKit et SwiftUI** (« cannot find type in scope » sinon).

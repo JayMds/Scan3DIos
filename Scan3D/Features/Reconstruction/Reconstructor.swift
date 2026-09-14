@@ -32,9 +32,9 @@ final class Reconstructor {
         self.onEvenement = onEvenement
     }
 
-    /// `checkpoint` vaut nil en mode plateau : les poses ARKit d'un iPhone
-    /// immobile sont toutes identiques, la reconstruction repart des images.
-    func lancer(images: URL, checkpoint: URL?, modele: URL) {
+    /// `checkpoint` : le dossier rempli par `ObjectCaptureSession` ; il accélère
+    /// la reconstruction et permet de reprendre après un échec.
+    func lancer(images: URL, checkpoint: URL, modele: URL) {
         do {
             var configuration = PhotogrammetrySession.Configuration()
             configuration.checkpointDirectory = checkpoint
@@ -43,7 +43,7 @@ final class Reconstructor {
             try session.process(requests: [.modelFile(url: modele)])
             self.session = session
             surveiller(session)
-            Logger.reconstruction.info("Reconstruction lancée, avec checkpoint : \(checkpoint != nil, privacy: .public)")
+            Logger.reconstruction.info("Reconstruction lancée")
         } catch {
             Logger.reconstruction.error("Reconstruction impossible : \(error.localizedDescription, privacy: .private)")
             onEvenement(.echec(Self.message(pour: error)))
@@ -169,7 +169,7 @@ final class Reconstructor {
         self.onEvenement = onEvenement
     }
 
-    func lancer(images: URL, checkpoint: URL?, modele: URL) {
+    func lancer(images: URL, checkpoint: URL, modele: URL) {
         onEvenement(.echec("La reconstruction nécessite un iPhone réel."))
     }
 

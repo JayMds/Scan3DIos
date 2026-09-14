@@ -329,27 +329,19 @@ sous `#if targetEnvironment(simulator)`, même interface que les vrais types.
   polluer Core ; `@MainActor enum` avec `static func` pour
   `isIdleTimerDisabled`.
 
-### `Scan3D/Features/Scan/EchecView.swift` et `ReconstructionPlaceholderView.swift`
+### `Scan3D/Features/Scan/EchecView.swift`
 
-- Vues « feuilles » avec closure en paramètre (`let fermer: () -> Void`)
-  ≈ prop callback.
+- Vue « feuille » avec closure en paramètre (`let fermer: () -> Void`)
+  ≈ prop callback. (Le `ReconstructionPlaceholderView` provisoire de cette
+  étape a été remplacé par `ReconstructionView` à l'étape 3.)
 
-### `Packages/Scan3DCore/Sources/Scan3DCore/Capture/CaptureMode.swift` (étape 2 bis)
+### Modifiés à l'étape 2
 
-**Rôle** : `orbit` / `turntable` et ce qui en découle (capture automatique,
-checkpoint, objectif de 36 photos par tour).
-
-- Enum à valeur brute `String` : rend le type utilisable tel quel avec
-  `@AppStorage` (préférence dans `UserDefaults`).
-- `static let` dérivée d'une autre (`360 / turntableShotsPerTurn`) ; fonction
-  pure bornée par `min` / `max`.
-
-### `Scan3D/Features/Scan/PreparationView.swift` (modifié à l'étape 2 bis)
-
-- `@AppStorage("modeCapture") var mode: CaptureMode` : lecture/écriture
-  automatique d'une préférence, comme `useState` branché sur `AsyncStorage`.
-- `Picker` segmenté + `ForEach(CaptureMode.allCases)` + `.tag(mode)`.
-- Liste de conseils calculée par `Conseil.pour(mode)`.
+- `ScanFlowModel.swift` — événements du contrôleur → transitions, mesure des
+  photos (`bilanCapture`).
+- `ScanFlowView.swift` — titre par phase, nouvelles sous-vues, `onDisappear`.
+- `ScanStore.swift` — `tailleImages` : `FileManager.enumerator` et
+  `for case let url as URL` (boucle avec motif de cast).
 
 ## Tranche 1 — étape 3 : reconstruction
 
@@ -407,14 +399,6 @@ l'annule, et traduit ses sorties en événements.
 - `ScanFlowView.swift` — bouton de barre conditionnel (« Fermer » / « Annuler »).
 - `ScanStore.swift` — boucle `for … where` pour ne supprimer que les
   dossiers présents.
-
-### Modifiés à l'étape 2
-
-- `ScanFlowModel.swift` — événements du contrôleur → transitions, mesure des
-  photos (`bilanCapture`).
-- `ScanFlowView.swift` — titre par phase, nouvelles sous-vues, `onDisappear`.
-- `ScanStore.swift` — `tailleImages` : `FileManager.enumerator` et
-  `for case let url as URL` (boucle avec motif de cast).
 
 ## Les fichiers non-Swift
 

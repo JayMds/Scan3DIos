@@ -303,7 +303,11 @@ Annuler → confirmation → Accueil, « Scan <UUID> supprimé ». Puis : Annule
 pleine capture → confirmation → l'écran se remet en veille après le délai
 réglé.
 
-### Étape 2 bis — Mode plateau tournant ✅ (13/09/2026, hors plan initial)
+### Étape 2 bis — Mode plateau tournant ❌ retiré (13-14/09/2026, hors plan initial)
+
+> Livré le 13/09 (commit `fd9ad3c`), en échec au test terrain le 14/09, puis
+> **retiré du code** sur décision de Jinkuro (option F : report en
+> tranche 4). La description ci-dessous est conservée comme historique.
 
 Demande de Jinkuro après le test de l'étape 2 : tourner autour de l'objet
 est peu pratique, il possède un plateau rotatif **manuel**. Options
@@ -361,9 +365,13 @@ for RealityKit Object Capture ») repose au contraire sur des photos simples
 ARKit ; la même page indique que la création d'objets accepte les images de
 « n'importe quel appareil photo » sur iOS 17+ et macOS 12+.
 
-Suite : décision en attente (option B en tête, voir la conversation du
-14/09/2026). En attendant, le mode plateau reste sélectionnable mais ne
-produit pas de modèle.
+Options présentées le 14/09/2026 : B1) prototype de capture maison
+(AVFoundation + profondeur LiDAR) puis finition, B2) capture maison complète
+d'emblée, F) report au compagnon Mac, G) abandon. **Retenu : F.** Le code de
+l'option A est retiré (`CaptureMode`, sélecteur de mode, bouton Photo,
+branches du contrôleur) : il reposait sur une approche réfutée, et la
+tranche 4 utilisera une autre capture. `ROADMAP.md` (tranche 4) et
+`CLAUDE.md` (pièges) consignent la leçon.
 
 Incertitudes ajoutées : (8) qualité de reconstruction en mode plateau ;
 (9) `ObjectCapturePointCloudView` avec une caméra fixe peut afficher un
@@ -403,8 +411,9 @@ Core :
 App :
 - `Features/Reconstruction/Reconstructor.swift` — `@MainActor @Observable`,
   unique propriétaire de la `PhotogrammetrySession` :
-  `lancer(images:checkpoint:modele:)` (checkpoint nil en mode plateau,
-  requête `.modelFile(url:)` au détail `.reduced` par défaut), boucle
+  `lancer(images:checkpoint:modele:)` (requête `.modelFile(url:)` au
+  détail `.reduced` par défaut ; le checkpoint est devenu obligatoire au
+  retrait du mode plateau), boucle
   `for try await` sur `outputs` → événements `progression / info / terminee /
   echec / annulee`, journalisation des photos invalides ou sautées, du
   sous-échantillonnage et du raccord incomplet ; messages français pour

@@ -40,6 +40,11 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
 - App macOS partageant `Scan3DCore` : reconstruction haute précision.
 - Transfert iPhone → Mac en réseau local (Bonjour + Network), appairage
   authentifié, aucun serveur.
+- **Mode plateau tournant** (reporté de la tranche 1 le 14/09/2026) : iPhone
+  fixe sur support, objet sur plateau manuel, photos simples avec
+  profondeur LiDAR (AVFoundation, **pas** `ObjectCaptureSession`) devant un
+  fond uni, reconstruction sur Mac. Voir `TRANCHE-1-PLAN.md`, étape 2 bis,
+  pour l'échec de la première approche et ses causes.
 - **Validé quand** : un même objet reconstruit sur Mac est mesurablement
   plus précis que sur iPhone.
 

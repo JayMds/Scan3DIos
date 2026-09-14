@@ -24,7 +24,6 @@ enum ScanFlowError: LocalizedError {
 @MainActor @Observable
 final class ScanFlowModel {
     private(set) var phase: ScanPhase = .preparation
-    private(set) var mode: CaptureMode = .orbit
     private(set) var autorisationCamera = CameraAuthorization.statut
     private(set) var layout: ScanLayout?
     /// Présent de la détection à la fin de la capture ; nil ensuite (mémoire).
@@ -44,9 +43,6 @@ final class ScanFlowModel {
     /// Pendant `annuler()`, les derniers événements des sessions sont ignorés
     /// (sinon un échec provoqué par l'arrêt s'afficherait avant la fermeture).
     private var annulationEnCours = false
-    /// Mode plateau : `numberOfShotsTaken` est cumulé sur toutes les passes,
-    /// on retient le compteur au début du tour pour afficher « n / 36 ».
-    private(set) var photosAuDebutDuTour = 0
     private(set) var demarrageEnCours = false
     /// Non nil → l'UI présente une alerte ; elle le remet à nil en la fermant.
     var erreur: ScanFlowError?
@@ -68,20 +64,15 @@ final class ScanFlowModel {
         if case .preview = phase { true } else { false }
     }
 
-    var photosCeTour: Int {
-        max(0, (capture?.nombrePhotos ?? 0) - photosAuDebutDuTour)
-    }
-
     // MARK: Préparation (écran 2)
 
     /// Bouton « Commencer » : permission caméra, espace disque, dossier du
     /// scan, puis ouverture de la session de capture. Chaque refus laisse
     /// l'utilisateur sur l'écran de préparation avec une explication.
-    func demarrer(mode: CaptureMode) async {
+    func demarrer() async {
         guard !demarrageEnCours else { return }
         demarrageEnCours = true
         defer { demarrageEnCours = false }
-        self.mode = mode
 
         if autorisationCamera == .nonDeterminee {
             autorisationCamera = await CameraAuthorization.demander()
@@ -137,30 +128,14 @@ final class ScanFlowModel {
         capture?.commencerCapture()
     }
 
-    /// Mode plateau : une photo à la demande.
-    func prendrePhoto() {
-        capture?.prendrePhoto()
-    }
-
-    /// Mode plateau : l'iPhone ne bougeant pas, RealityKit ne saura jamais
-    /// que le tour est fini — c'est l'utilisateur qui le déclare.
-    func terminerTour() {
-        if phase == .capture { transiter(vers: .passComplete) }
-    }
-
     /// La session reste en `.capturing` et n'émet rien : on transite nous-mêmes.
     func nouvellePasse() {
         capture?.nouvellePasse()
-        commencerUnTour()
+        transiter(vers: .capture)
     }
 
     func nouvellePasseApresRetournement() {
         capture?.nouvellePasseApresRetournement()
-        commencerUnTour()
-    }
-
-    private func commencerUnTour() {
-        photosAuDebutDuTour = capture?.nombrePhotos ?? 0
         transiter(vers: .capture)
     }
 
@@ -170,7 +145,7 @@ final class ScanFlowModel {
     }
 
     private func lancerCapture(pour layout: ScanLayout) {
-        let controller = CaptureController(layout: layout, mode: mode) { [weak self] evenement in
+        let controller = CaptureController(layout: layout) { [weak self] evenement in
             self?.traiter(evenement)
         }
         capture = controller
@@ -238,7 +213,7 @@ final class ScanFlowModel {
         VeilleEcran.empecher(true)
         reconstructor.lancer(
             images: layout.imagesDirectory,
-            checkpoint: mode.usesCheckpoint ? layout.checkpointDirectory : nil,
+            checkpoint: layout.checkpointDirectory,
             modele: layout.modelFile
         )
     }

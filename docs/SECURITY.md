@@ -16,6 +16,7 @@ traîne. On traite ces photos comme des données personnelles.
 |--------|---------|--------|
 | Vol de l'iPhone déverrouillé / sauvegarde lue | 1 | Protection de fichiers iOS, exclusion de la sauvegarde iCloud |
 | Fuite de géolocalisation via EXIF | 1 | Vérifier et retirer les métadonnées GPS avant tout partage |
+| Fuite par le fichier exporté | 1 | STL = géométrie seule (ni photo, ni EXIF), en-tête et nom sans donnée personnelle ; fichier temporaire `.complete`, supprimé à la fermeture de la feuille de partage, dossier purgé à chaque export |
 | Fuite via les logs | 1 | `Logger` avec `privacy: .private` pour chemins et noms |
 | Saisie aberrante (calibrage) | 2 | Validation stricte (`ScaleCalibration`, déjà en place) |
 | Fichier 3MF malveillant importé (**zip slip**) | 3 | Refuser tout chemin contenant `..` ou absolu lors de la décompression |

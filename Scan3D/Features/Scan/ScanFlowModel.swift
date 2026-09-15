@@ -45,6 +45,11 @@ final class ScanFlowModel {
     /// « 9,8 Mo » une fois le modèle écrit.
     private(set) var tailleModele: String?
     private(set) var mesure: MesureModele = .enCours
+    /// Le maillage mesuré, gardé pour l'export STL (≈ 1 Mo pour 50 k triangles).
+    private(set) var maillage: Mesh?
+    private(set) var exportEnCours = false
+    /// Non nil → l'écran d'aperçu présente une alerte.
+    private(set) var erreurExport: String?
     /// Vrai si l'échec vient de la reconstruction : les photos sont encore
     /// là, on peut relancer (le checkpoint accélère la reprise).
     private(set) var reprisePossible = false
@@ -56,9 +61,11 @@ final class ScanFlowModel {
     var erreur: ScanFlowError?
 
     private let store: ScanStore
+    private let exporteur: STLExporter
 
-    init(store: ScanStore = ScanStore()) {
+    init(store: ScanStore = ScanStore(), exporteur: STLExporter = STLExporter()) {
         self.store = store
+        self.exporteur = exporteur
     }
 
     /// Vrai aussi après un échec de reconstruction : annuler effacerait les
@@ -261,6 +268,7 @@ final class ScanFlowModel {
                 try MeshLoader.load(contentsOf: modele)
             }.value
             let dimensions = Dimensions(boundingBox: maillage.boundingBox)
+            self.maillage = maillage
             mesure = .reussie(dimensions, triangles: maillage.triangleCount)
             // Des cotes d'objet ne sont pas une donnée personnelle : publiques,
             // utiles pour comparer au test à la règle.
@@ -269,6 +277,36 @@ final class ScanFlowModel {
             mesure = .echec
             Logger.reconstruction.error("Mesure du modèle impossible : \(String(describing: error), privacy: .public)")
         }
+    }
+
+    // MARK: Export (écran 8)
+
+    var exportPossible: Bool { maillage != nil }
+
+    /// Écrit le STL en millimètres et renvoie son emplacement ; nil en cas
+    /// d'échec (message dans `erreurExport`).
+    func preparerExportSTL() async -> URL? {
+        guard let maillage, !exportEnCours else { return nil }
+        exportEnCours = true
+        defer { exportEnCours = false }
+        do {
+            return try await exporteur.ecrire(maillage, nom: ExportFilename.stl(date: .now))
+        } catch {
+            erreurExport = "Le fichier STL n'a pas pu être créé. Vérifiez l'espace disponible, puis réessayez."
+            Logger.export.error("Écriture du STL impossible : \(error.localizedDescription, privacy: .private)")
+            return nil
+        }
+    }
+
+    /// Feuille de partage fermée, après un partage ou une annulation : le
+    /// fichier temporaire ne doit pas rester sur l'iPhone.
+    func exportTermine(_ fichier: URL, partage: Bool) async {
+        Logger.export.info("Feuille de partage fermée, fichier partagé : \(partage, privacy: .public)")
+        await exporteur.supprimer(fichier)
+    }
+
+    func effacerErreurExport() {
+        erreurExport = nil
     }
 
     /// D1 : le modèle est là, les photos ne servent plus sur l'iPhone.

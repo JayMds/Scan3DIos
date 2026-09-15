@@ -480,6 +480,72 @@ et textes pour l'écran et VoiceOver.
 - `ScanFlowView.swift` — `case .preview(let modele)` : extraction de la
   valeur associée directement dans le `switch`.
 
+## Tranche 1 — étape 5 : export STL
+
+Ajoutés le 15/09/2026.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Export/STLWriter.swift`
+
+**Rôle** : transforme un `Mesh` en fichier STL binaire en millimètres
+(en-tête, nombre de triangles, normale + 3 sommets + attribut par triangle).
+
+- `Data(capacity:)` + `append` ≈ un `ArrayBuffer` qu'on remplit.
+- `withUnsafeBytes(of: valeur.littleEndian)` : les octets bruts d'un nombre,
+  dans l'ordre imposé par le format (≈ `DataView.setUint32(…, true)`).
+- `Float.bitPattern` : les 32 bits d'un flottant, sans conversion.
+- `stride(from:to:by:)` ≈ `for (let i = 0; i < n; i += 3)`.
+- `cross` / `length` de `simd` : produit vectoriel et norme.
+- `static let header: Data = { … }()` : constante calculée une seule fois
+  par une closure immédiatement exécutée (≈ IIFE).
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Export/ExportFilename.swift`
+
+**Rôle** : nom de fichier daté « Scan3D-2026-09-15-14h32.stl ».
+
+- `Calendar(identifier: .gregorian)` + `timeZone` injectable : le test fixe
+  le fuseau pour un résultat déterministe (≈ figer `Date` dans Vitest).
+
+### `STLWriterTests.swift`
+
+- Relecteur STL minimal écrit dans le test (`STLRelu`) : on vérifie les
+  octets produits, pas seulement l'absence d'erreur.
+- `#require` : comme `#expect`, mais arrête le test si la condition échoue
+  (≈ `expect(...)` suivi d'un `return`).
+- Tuples nommés dans un tableau : `(normale: …, sommets: …, attribut: …)`.
+
+### `Scan3D/Features/Export/STLExporter.swift`
+
+**Rôle** : écrit le STL dans `tmp/Export/`, protégé, et le supprime sur
+demande.
+
+- Troisième `actor` de l'app (après `ScanStore`) : les écritures disque ne
+  bloquent jamais l'interface.
+- `Data.write(to:options: [.atomic, .completeFileProtection])` : écriture
+  atomique et classe de protection posée en une ligne.
+- `URL.temporaryDirectory` : dossier temporaire de l'app (jamais sauvegardé
+  dans iCloud, vidé par le système).
+
+### `Scan3D/Features/Export/FeuilleDePartage.swift`
+
+**Rôle** : ouvre la feuille de partage iOS et prévient à sa fermeture.
+
+- **Pont UIKit** : `UIActivityViewController` présenté à la main depuis
+  l'écran visible (`connectedScenes` → `keyWindow` → `rootViewController` →
+  `presentedViewController`), faute d'équivalent SwiftUI avec rappel.
+- Closure `@escaping @MainActor` : le rappel s'exécute sur le fil de
+  l'interface ; `Task { @MainActor in … }` pour y revenir depuis un rappel
+  UIKit non isolé.
+- `if let popover = …` : l'optionnel n'existe que sur iPad.
+
+### Modifiés à l'étape 5
+
+- `ApercuView.swift` — bouton d'export avec `Group { if … ProgressView …
+  else Label … }`, alerte liée par `Binding(get:set:)`, fonction `async`
+  privée appelée depuis `Task { await exporter() }`.
+- `ScanFlowModel.swift` — `private(set) var maillage: Mesh?`, export avec
+  `defer` pour relâcher l'indicateur quel que soit le chemin.
+- `Journal.swift` — catégorie `export`.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

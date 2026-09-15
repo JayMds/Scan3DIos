@@ -560,33 +560,67 @@ Lecture :
   sous l'objet, ou des rabats soulevés — à confirmer visuellement dans Quick
   Look.
 
-### Étape 5 — Export STL en millimètres
+### Étape 5 — Export STL en millimètres ✅ (15/09/2026, en attente du test Bambu Studio)
 
 Objectif : `Scan3D-<date>.stl` partagé via la feuille iOS, ouvert dans Bambu
 Studio à la bonne taille.
 
-Core :
-- `Export/STLWriter.swift` — STL **binaire** (en-tête 80 octets, `UInt32`
-  nombre de triangles, 50 octets/triangle, little-endian), normales
-  calculées, mise à l'échelle par `Units`. Tests : cube 0,05 m → sommets à
-  ±25 mm, taille du fichier = 84 + 50 × n, relecture des 12 triangles ; mesh
-  vide refusé.
-- `Export/ExportFilename.swift` — nom de fichier daté.
+Vérifié dans le SDK : `ShareLink` (SwiftUI) ne signale pas la fermeture de
+la feuille de partage → `UIActivityViewController` et son
+`completionWithItemsHandler` (type non marqué `@MainActor` par UIKit) ;
+iOS connaît le type STL (`public.standard-tesselated-geometry-format`,
+conforme au contenu 3D).
+
+Core (`Sources/Scan3DCore/Export/`) :
+- `STLWriter.swift` — STL **binaire** little-endian : en-tête de 80 octets
+  (« Scan3D binary STL - units: millimeters », jamais « solid… »),
+  `UInt32` nombre de triangles, 50 octets par triangle ; sommets × 1000 via
+  `Units.metersToMillimeters` ; normale selon la règle de la main droite,
+  vecteur nul pour un triangle dégénéré ; `STLError.tooManyTriangles` si le
+  nombre ne tient pas sur 32 bits.
+- `ExportFilename.swift` — « Scan3D-2026-09-15-14h32.stl » (triable, sans
+  « : », « / » ni espace).
+- Tests : `STLWriterTests.swift` (cube 0,05 m → 684 octets, 12 triangles,
+  sommets à ±25 mm ; normale et échelle ; triangle dégénéré ; nombre en
+  little-endian ; en-tête) et `ExportFilenameTests` (nom daté). Le « refus
+  d'un maillage vide » prévu est garanti par le type : un `Mesh` vide ne
+  peut pas exister.
 
 App :
-- `Features/Export/STLExporter.swift` — dossier temporaire dédié,
-  `ShareLink(item:)` (ou `UIActivityViewController` si `ShareLink` ne propose
-  pas Bambu Handy), suppression du fichier temporaire après partage.
+- `Features/Export/STLExporter.swift` — `actor` : vide puis recrée
+  `tmp/Export/` (protégé `.complete`), écrit avec
+  `[.atomic, .completeFileProtection]`, supprime le fichier sur demande.
+- `Features/Export/FeuilleDePartage.swift` — présente
+  `UIActivityViewController` depuis l'écran visible, ancre de popover pour
+  iPad, rappel `fermeture(partage:)` ramené sur le `@MainActor`.
+- `Features/Apercu/ApercuView.swift` — bouton principal « Exporter en STL »
+  (indicateur pendant l'écriture), « Voir en 3D » déplacé dans la liste,
+  alerte d'erreur, annonce VoiceOver « Fichier STL partagé ».
+- `Features/Scan/ScanFlowModel.swift` — garde le `maillage` mesuré,
+  `preparerExportSTL()`, `exportTermine(_:partage:)` (suppression dans tous
+  les cas), `exportPossible`, `erreurExport`.
+- `App/Journal.swift` — `Logger.export`.
 
-Risques : STL sans unités — la convention « mm » des slicers fait foi, d'où
-le test ×1000.
-Sécurité : le STL ne contient que de la géométrie (pas d'EXIF, pas de photo) ;
-seule donnée qui quitte l'appareil, sur action explicite.
-Accessibilité : `ShareLink` natif.
+Risques restants : si l'iPhone se verrouille pendant un long transfert
+AirDrop, la protection `.complete` peut l'interrompre (quelques Mo : peu
+probable) ; l'app cible doit déclarer accepter les STL pour apparaître dans
+la feuille (Bambu Handy à confirmer au test).
+Sécurité : seule donnée qui quitte l'appareil, sur action explicite ;
+géométrie pure (ni photo, ni EXIF, ni position) ; en-tête et nom sans donnée
+personnelle ; fichier temporaire protégé et supprimé à la fermeture de la
+feuille, dossier purgé à chaque export.
+Accessibilité : bouton avec indice explicite, indicateur d'écriture
+étiqueté, feuille de partage système, annonce après partage.
 
-Test iPhone : exporter → AirDrop vers le Mac → Bambu Studio : dimensions
-cohérentes avec l'écran Aperçu ; envoyer vers Bambu Handy / Fichiers ;
-vérifier que le fichier temporaire a disparu (log du seul nom de fichier).
+Test iPhone : (1) Aperçu → « Exporter en STL » → la feuille affiche
+« Scan3D-….stl » ; Console : « STL écrit : N triangles, X octets » avec
+X = 84 + 50 × N. (2) AirDrop vers le Mac → ouvrir dans Bambu Studio :
+taille de l'objet égale aux cotes de l'écran Aperçu (pas 1000 fois plus
+petite) → Console : « fichier partagé : true », « Fichier d'export
+supprimé ». (3) Rouvrir la feuille et annuler → « fichier partagé :
+false », fichier supprimé. (4) Si installé : Bambu Handy apparaît-il dans
+la feuille ? Sinon « Enregistrer dans Fichiers ». (5) VoiceOver : après un
+partage, entendre « Fichier STL partagé ».
 
 ## D. Vérification globale de la tranche
 

@@ -3,8 +3,9 @@ import SwiftUI
 import QuickLook
 import Scan3DCore
 
-/// Écran 7 : les cotes en millimètres d'abord — c'est ce qui intéresse un
-/// utilisateur d'imprimante 3D —, puis la visionneuse 3D native d'Apple.
+/// Écrans 7 et 8 : les cotes en millimètres d'abord — c'est ce qui intéresse
+/// un utilisateur d'imprimante 3D —, la visionneuse 3D d'Apple, puis l'export
+/// STL par la feuille de partage.
 struct ApercuView: View {
     let model: ScanFlowModel
     let modele: URL
@@ -24,9 +25,18 @@ struct ApercuView: View {
                 sectionDimensions(dimensions, triangles: triangles)
             case .echec:
                 Section {
-                    Label("Le modèle n'a pas pu être mesuré. Vous pouvez tout de même l'afficher en 3D.",
+                    Label("Le modèle n'a pas pu être mesuré ni exporté. Vous pouvez tout de même l'afficher en 3D.",
                           systemImage: "exclamationmark.triangle")
                 }
+            }
+
+            Section {
+                Button {
+                    modeleAffiche = modele
+                } label: {
+                    Label("Voir en 3D", systemImage: "cube.transparent")
+                }
+                .accessibilityHint("Ouvre la visionneuse 3D, avec un mode réalité augmentée à l'échelle réelle.")
             }
         }
         .safeAreaInset(edge: .bottom) { boutons }
@@ -38,6 +48,11 @@ struct ApercuView: View {
             if case .reussie(let dimensions, _) = mesure {
                 AccessibilityNotification.Announcement("Modèle prêt : \(DimensionsFormatter.spoken(dimensions))").post()
             }
+        }
+        .alert("Export impossible", isPresented: erreurExportPresente) {
+            Button("OK") {}
+        } message: {
+            Text(model.erreurExport ?? "")
         }
     }
 
@@ -80,13 +95,21 @@ struct ApercuView: View {
     private var boutons: some View {
         VStack(spacing: 12) {
             Button {
-                modeleAffiche = modele
+                Task { await exporter() }
             } label: {
-                Label("Voir en 3D", systemImage: "cube.transparent")
-                    .frame(maxWidth: .infinity)
+                Group {
+                    if model.exportEnCours {
+                        ProgressView()
+                            .accessibilityLabel("Préparation du fichier STL")
+                    } else {
+                        Label("Exporter en STL", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .accessibilityHint("Ouvre la visionneuse 3D, avec un mode réalité augmentée à l'échelle réelle.")
+            .disabled(!model.exportPossible || model.exportEnCours)
+            .accessibilityHint("Crée un fichier STL en millimètres et ouvre la feuille de partage : AirDrop, Fichiers, application de votre imprimante.")
 
             Button(action: terminer) {
                 Text("Terminer")
@@ -97,5 +120,27 @@ struct ApercuView: View {
         .controlSize(.large)
         .padding()
         .background(.bar)
+    }
+
+    /// Écrit le fichier, ouvre la feuille de partage, et supprime le fichier à
+    /// sa fermeture — que l'utilisateur ait partagé ou annulé.
+    private func exporter() async {
+        guard let fichier = await model.preparerExportSTL() else { return }
+        let ouverte = FeuilleDePartage.presenter(fichier) { partage in
+            if partage {
+                AccessibilityNotification.Announcement("Fichier STL partagé").post()
+            }
+            Task { await model.exportTermine(fichier, partage: partage) }
+        }
+        if !ouverte {
+            await model.exportTermine(fichier, partage: false)
+        }
+    }
+
+    private var erreurExportPresente: Binding<Bool> {
+        Binding(
+            get: { model.erreurExport != nil },
+            set: { visible in if !visible { model.effacerErreurExport() } }
+        )
     }
 }

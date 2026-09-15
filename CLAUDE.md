@@ -112,6 +112,9 @@ terminée si l'une des deux échoue.
   vertical — échelle confirmée à la règle le 15/09/2026), n'applique pas les transformations parentes aux sommets
   (`MDLTransform.globalTransform`), et le pas entre sommets varie : toujours
   lire `stride`. Toute lecture passe par `MeshLoader` de `Scan3DCore`.
+- **`ShareLink` ne signale pas la fermeture** de la feuille de partage :
+  pour supprimer un fichier après partage, passer par `FeuilleDePartage`
+  (`UIActivityViewController` + `completionWithItemsHandler`).
 - **`.quickLookPreview`** vient du framework QuickLook : `import QuickLook`
   obligatoire, SwiftUI seul ne le connaît pas.
 - **Reconstruction sur iPhone** : un seul niveau de détail, `.reduced`

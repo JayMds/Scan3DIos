@@ -560,7 +560,7 @@ Lecture :
   sous l'objet, ou des rabats soulevés — à confirmer visuellement dans Quick
   Look.
 
-### Étape 5 — Export STL en millimètres ✅ (15/09/2026, en attente du test Bambu Studio)
+### Étape 5 — Export STL en millimètres ✅ (15/09/2026)
 
 Objectif : `Scan3D-<date>.stl` partagé via la feuille iOS, ouvert dans Bambu
 Studio à la bonne taille.
@@ -622,6 +622,9 @@ false », fichier supprimé. (4) Si installé : Bambu Handy apparaît-il dans
 la feuille ? Sinon « Enregistrer dans Fichiers ». (5) VoiceOver : après un
 partage, entendre « Fichier STL partagé ».
 
+Résultat (15/09/2026) : (2) **STL ouvert dans Bambu Studio à la bonne
+taille** — critère de la tranche atteint. Points (3) à (5) non rapportés.
+
 ## D. Vérification globale de la tranche
 
 1. `make test-core` et `make build-check` verts à chaque étape.
@@ -631,3 +634,7 @@ partage, entendre « Fichier STL partagé ».
    message de fin de chaque étape.
 4. Critère ROADMAP : un objet du quotidien scanné, exporté, ouvert dans Bambu
    Studio avec des dimensions cohérentes.
+
+Résultat (15/09/2026) : 1 ✅ (et compilation simulateur vérifiée) ;
+2 partiel — parcours complet réussi, tests d'accessibilité et second iPhone
+non rapportés ; 3 ✅ ; 4 ✅. Détail : `BILAN-TRANCHE-1.md`.

@@ -46,6 +46,9 @@ Puis colle le contenu de `PROMPT-DEMARRAGE.md`.
 
 - `CLAUDE.md` — règles du projet (lues automatiquement par Claude Code)
 - `docs/ROADMAP.md` — les tranches
-- `docs/TRANCHE-1.md` — spec de la tranche en cours
+- `docs/TRANCHE-1.md` — spec de la tranche 1 (validée)
+- `docs/TRANCHE-1-PLAN.md` — plan d'implémentation, API vérifiées, résultats des tests
+- `docs/BILAN-TRANCHE-1.md` — bilan et points ouverts
+- `docs/VISITE-GUIDEE.md` — rôle et notions Swift de chaque fichier
 - `docs/SECURITY.md` — modèle de menaces
 - `docs/SWIFT-POUR-TS.md` — lire du Swift quand on vient de TypeScript

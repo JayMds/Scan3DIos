@@ -24,8 +24,9 @@ imprimante 3D et savent s'en servir.
 ## Méthode
 
 - **Tranches verticales** : chaque tranche livre une app fonctionnelle de bout
-  en bout. Feuille de route : `docs/ROADMAP.md`. Tranche en cours : voir
-  `docs/TRANCHE-1.md`.
+  en bout. Feuille de route : `docs/ROADMAP.md`. Tranche 1 validée le
+  15/09/2026 (bilan et points ouverts : `docs/BILAN-TRANCHE-1.md`) ; la
+  tranche 2 reste à spécifier.
 - Commence chaque tâche non triviale en **mode plan** : liste les fichiers
   touchés et les risques avant de coder.
 - Petits commits atomiques, message en français, préfixe conventionnel

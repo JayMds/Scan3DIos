@@ -3,19 +3,20 @@
 Chaque tranche livre une app utilisable de bout en bout, testée sur iPhone.
 On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
 
-## Tranche 0 — Fondations (ce kit)
+## Tranche 0 — Fondations (ce kit) ✅
 
 - Projet XcodeGen, paquet `Scan3DCore`, tests Swift Testing, Makefile.
 - **Validé quand** : `make test-core` et `make build-check` passent, l'app
   s'installe sur l'iPhone et affiche « Prêt à scanner ».
 
-## Tranche 1 — Scanner, voir, exporter
+## Tranche 1 — Scanner, voir, exporter ✅ validée le 15/09/2026
 
 - Capture guidée (`ObjectCaptureSession`), reconstruction sur l'iPhone,
   aperçu 3D, export STL en millimètres via la feuille de partage.
 - Spec détaillée : `TRANCHE-1.md`.
 - **Validé quand** : un objet du quotidien (tasse, boîte) est scanné,
   exporté, ouvert dans Bambu Studio avec des dimensions cohérentes.
+- Bilan et points ouverts : `BILAN-TRANCHE-1.md`.
 
 ## Tranche 2 — Précision
 

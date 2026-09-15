@@ -3,12 +3,20 @@ import Scan3DCore
 
 /// Conteneur du parcours de scan : affiche la sous-vue de la phase courante
 /// et porte le bouton Annuler commun (≈ le `_layout.tsx` d'un groupe d'écrans
-/// expo-router). Présenté en plein écran depuis l'accueil.
+/// expo-router). Présenté en plein écran depuis l'accueil ; se ferme de
+/// lui-même une fois le scan enregistré.
 struct ScanFlowView: View {
-    @State private var model = ScanFlowModel()
+    @State private var model: ScanFlowModel
     @State private var confirmerAnnulation = false
+    /// Prévient l'accueil du scan enregistré, avant la fermeture.
+    private let termine: (ScanLayout) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+
+    init(store: ScanStore, termine: @escaping (ScanLayout) -> Void) {
+        _model = State(initialValue: ScanFlowModel(store: store))
+        self.termine = termine
+    }
 
     var body: some View {
         NavigationStack {
@@ -17,10 +25,9 @@ struct ScanFlowView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        if model.scanTermine {
-                            // Le modèle reste dans Scans/<UUID>/ (bibliothèque en tranche 2).
-                            Button("Fermer") { dismiss() }
-                        } else {
+                        // Pendant l'enregistrement (une ou deux secondes), plus
+                        // rien à annuler : le parcours va se fermer seul.
+                        if !model.enregistrementEnCours {
                             Button("Annuler") { demanderAnnulation() }
                         }
                     }
@@ -46,6 +53,11 @@ struct ScanFlowView: View {
         }
         .onChange(of: scenePhase) { _, nouvelle in
             if nouvelle == .active { model.rafraichirAutorisation() }
+        }
+        .onChange(of: model.scanEnregistre) { _, layout in
+            guard let layout else { return }
+            termine(layout)
+            dismiss()
         }
         // Filet de sécurité : quel que soit le chemin de sortie, l'écran
         // retrouve sa mise en veille.
@@ -76,11 +88,10 @@ struct ScanFlowView: View {
                 }
             case .reconstruction:
                 ReconstructionView(model: model)
-            case .preview(let modele):
-                // Le modèle reste dans Scans/<UUID>/ pour la bibliothèque (tranche 2).
-                ApercuView(model: model, modele: modele) {
-                    dismiss()
-                }
+            case .preview:
+                // Fiche et nettoyage des photos ; le détail s'ouvre ensuite
+                // depuis la bibliothèque.
+                ProgressView("Enregistrement du scan…")
             case .failed(let message):
                 EchecView(message: message, reprendre: reprise) {
                     Task { await annuler() }
@@ -102,7 +113,7 @@ struct ScanFlowView: View {
         case .capture: "Capture"
         case .passComplete: "Passe terminée"
         case .reconstruction: "Reconstruction"
-        case .preview: "Aperçu"
+        case .preview: "Enregistrement"
         case .failed: "Erreur"
         }
     }
@@ -130,5 +141,5 @@ struct ScanFlowView: View {
 }
 
 #Preview {
-    ScanFlowView()
+    ScanFlowView(store: ScanStore()) { _ in }
 }

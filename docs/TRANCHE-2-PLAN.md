@@ -64,42 +64,105 @@ Jinkuro.
   tranche en cours → `docs/TRANCHE-2.md`. `ROADMAP.md` — décisions E1-E4.
 - Jinkuro : tests iPhone non rapportés de la tranche 1 (point ouvert 4 du bilan).
 
-### Étape 1 — Bibliothèque des scans (et découpage de `ScanFlowModel`)
+### Étape 1 — Bibliothèque des scans (et découpage de `ScanFlowModel`) — livrée le 15/09/2026, test iPhone en attente
 
-Core (`Library/`) :
-- `ScanRecord.swift` — `struct ScanRecord: Codable, Equatable, Sendable, Identifiable` :
-  `schemaVersion`, `id`, `name`, `createdAt`, `triangleCount`, `dimensions` (brutes), `calibration:
-  ScaleCalibration?` ; décodage **validé** (nom 1-80 caractères après nettoyage, nombres finis,
-  facteur dans `ScaleCalibration.plausibleRange`) ; `defaultName(date:)` (« Scan du 15/09/2026 14:32 »).
-- `ScanLibrary.swift` — classe les dossiers de `Scans/` : `.complete` (modèle + `scan.json` valide),
-  `.modelWithoutRecord` (scans de la tranche 1 → récupérables), `.incomplete` (pas de modèle → photos
-  orphelines à purger) ; lecture bornée (`scan.json` ≤ 64 Ko), écriture atomique, tri par date.
-- `ScanLayout` + `recordFile` ; `Dimensions` et `ScaleCalibration` deviennent `Codable` (décodage
-  revalidé par `init(measuredMM:actualMM:)` / `CalibrationError`).
-- Tests : aller-retour JSON, JSON invalide / trop gros / version inconnue refusés, classification de
-  dossiers dans un répertoire temporaire, tri, nom par défaut.
+Core (`Sources/Scan3DCore/Library/`) :
+- `ScanRecord.swift` — `struct ScanRecord: Codable, Equatable, Sendable,
+  Identifiable` : `id`, `name`, `createdAt` (arrondie à la seconde),
+  `triangleCount`, `dimensions` (brutes), `calibration?`. `schemaVersion`
+  n'est pas une propriété : écrit à 1, lu **avant** le reste (une version
+  future a peut-être une autre structure). Décodage validé : nom 1-80
+  caractères visibles après nettoyage (`sanitizedName` : contrôles et
+  retours à la ligne → espaces fusionnés), triangles 1…2 M, date ISO 8601
+  écrite par le type lui-même, cotes et calibrage revalidés. Erreurs
+  `ScanRecordError` ; `rename(to:)` ; `defaultName(date:)` → « Scan du
+  15/09/2026 à 14:32 » ; `recoveredName` → « Scan récupéré ».
+- `ScanLibrary.swift` — `inspect(scansDirectory:)` classe chaque dossier :
+  `complete`, `missingRecord`, `invalidRecord` (corrompu, trop gros,
+  identifiant incohérent), `unreadableRecord` (lecture refusée → jamais
+  réécrite), `newerRecord(version:)` (jamais touchée), `incomplete` (pas de
+  modèle) ; `shouldPurge`, `shouldRemoveCaptureData` (photos restées à côté
+  d'un modèle). Seuls les dossiers nommés par un UUID en majuscules sont
+  considérés. `readRecord` lit au plus 64 Ko + 1 octet ; `write` atomique,
+  protection `.complete` par défaut ; `sortedNewestFirst` (ordre stable à
+  date égale).
+- `ScanLayout` : `recordFile`, `Hashable` ; `Dimensions` et
+  `ScaleCalibration` `Codable` (le calibrage stocke ses deux cotes, le
+  facteur est recalculé et revalidé).
+- Tests (`ScanLibraryTests.swift`, 2 suites, 22 tests) : aller-retour JSON,
+  date à la seconde, format du fichier, fiche manuelle, 4 non-fiches,
+  version future / nulle, 10 champs hors limites, nettoyage et longueur du
+  nom (émoji), renommage, nom par défaut, fiche depuis un maillage ;
+  classement de vrais dossiers temporaires, décisions de purge, dossier vide,
+  entrées inconnues (dont UUID en minuscules), `Scans/` absent, écriture puis
+  lecture, identifiant incohérent, fiche de 10 Mo, fiche absente, tri.
 
 App :
-- Refactor : `Features/DetailScan/DetailScanModel.swift` reprend de `ScanFlowModel` la mesure
-  (`mesurerModele`), le `maillage`, l'export (`preparerExportSTL`, `exportTermine`) ;
-  `Features/Apercu/ApercuView.swift` devient `Features/DetailScan/DetailScanView.swift` (+ renommer,
-  supprimer). `ScanFlowModel` s'arrête à la reconstruction : à la fin, il écrit `scan.json` et passe la
-  main au détail.
-- `Features/Bibliotheque/BibliothequeModel.swift` + `BibliothequeView.swift` — liste (nom, date,
-  cotes compactes, badge « Calibré »), glisser pour supprimer (avec confirmation), « Nouveau scan » ;
-  état vide = l'actuel « Prêt à scanner » ; écran « non compatible » conservé. Au lancement :
-  récupère les scans de la tranche 1 (mesure + `scan.json`), **purge les dossiers incomplets**.
-- `Features/Accueil/AccueilView.swift` → héberge la bibliothèque (`NavigationStack` avec chemin).
-- `Features/Scan/ScanStore.swift` — lister, lire / écrire `scan.json`, supprimer, purger (réutilise
-  `supprimer`, la protection `.complete`, l'exclusion de sauvegarde).
+- `Features/Bibliotheque/BibliothequeModel.swift` — liste et actions
+  (`charger`, `renommer`, `supprimer`, erreurs `BibliothequeErreur`) ; détient
+  l'unique `ScanStore`. **Premier inventaire de la session seulement** :
+  purge des dossiers incomplets et retrait des photos restées (plus tard, un
+  dossier sans modèle pourrait être un scan en cours). Scans sans fiche ou à
+  fiche invalide → fiche recréée d'après le modèle (« Scan récupéré », date
+  du jour : lire la date d'un fichier est une API à raison requise) ; modèle
+  illisible → ligne « Scan illisible », supprimable.
+- `Features/Bibliotheque/BibliothequeView.swift` — liste (nom, cotes, date,
+  « Calibré »), glisser pour supprimer + confirmation, bouton « Nouveau
+  scan » en bas ; vide → « Prêt à scanner ». `ScanRecord+Texte.swift` —
+  dates en français, phrase VoiceOver.
+- `Features/DetailScan/DetailScanModel.swift` (maillage, taille, export repris
+  de `ScanFlowModel`) et `DetailScanView.swift` (ex-`ApercuView` : cotes lues
+  dans la fiche, « Voir en 3D », « Exporter en STL », « Renommer » dans la
+  barre, « Supprimer le scan » + confirmation ; « Terminer » disparaît au
+  profit du retour).
+- `Features/Accueil/AccueilView.swift` — `NavigationStack(path:)` sur
+  `[ScanLayout]` ; à la fermeture du parcours : rechargement, puis ouverture
+  du détail du nouveau scan.
+- `Features/Scan/ScanFlowModel.swift` (312 lignes, contre 359) — s'arrête à
+  `enregistrer()` : fiche (nom daté du début du scan) **puis** suppression
+  des photos ; `ScanFlowView` affiche « Enregistrement du scan… » sans bouton
+  Annuler et se ferme seul.
+- `Features/Scan/ScanStore.swift` — `inventaire`, `purger`, `lireMaillage`,
+  `creerFiche`, `ecrireFiche`.
 
-Sécurité : `scan.json` traité comme entrée non fiable ; le nom saisi n'entre jamais dans un chemin
-(dossier = UUID) ; purge des photos orphelines ; suppression = dossier entier.
-Accessibilité : actions de glissement exposées à VoiceOver + bouton « Supprimer » dans le détail ;
-champ de renommage étiqueté ; Dynamic Type sur la liste.
-Test iPhone : les scans de la tranche 1 apparaissent avec leurs cotes ; renommer ; supprimer (Console :
-dossier supprimé) ; un nouveau scan arrive en tête ; tuer l'app pendant une capture puis relancer →
-Console : dossier incomplet purgé.
+Écarts au plan : le nom par défaut porte « à » (« Scan du 15/09/2026 à
+14:32 ») ; `ScanLibrary.write` prend ses options d'écriture en paramètre
+(macOS refuse la classe de protection dans `swift test`) ; les scans sans
+fiche lisible restent listés (« Scan illisible ») pour pouvoir les supprimer.
+Sécurité : `scan.json` = entrée non fiable (taille bornée, version, champs
+validés, identifiant = dossier) ; le nom n'entre jamais dans un chemin ni
+dans un journal ; purge des captures interrompues et des photos restées ;
+suppression = dossier entier ; aucune nouvelle permission ni API à raison
+requise.
+Accessibilité : ligne lue en une phrase (nom, date longue, cotes en
+centimètres, « calibré ») ; glisser pour supprimer exposé au rotor
+VoiceOver, doublé d'un bouton dans le détail ; champ de renommage étiqueté,
+longueur bornée pendant la frappe ; annonces « Scan enregistré dans la
+bibliothèque », « Scan renommé », « Scan supprimé » ; Dynamic Type (textes
+sur plusieurs lignes, pas de largeur fixe).
+
+Test iPhone :
+1. Installer par-dessus la version de la tranche 1 → les anciens scans
+   apparaissent, nommés « Scan récupéré », avec leurs cotes (dont la boîte
+   189,2 × 163,0 × 56,8 mm) ; Console (`stockage`) : « récupéré
+   (missingRecord) », « fiche écrite ».
+2. Ouvrir un scan → cotes, « Voir en 3D », « Exporter en STL » fonctionnent
+   comme en tranche 1.
+3. « Renommer » → « Boîte carton » → titre et liste mis à jour ; tuer l'app,
+   relancer → nom conservé. Essayer un nom vide → « Enregistrer » inactif
+   (à défaut, message « Le nom doit contenir entre 1 et 80 caractères »).
+4. Glisser un scan vers la gauche → « Supprimer » → confirmation → la ligne
+   disparaît ; Console : « Scan … supprimé ». Idem depuis le détail
+   (« Supprimer le scan ») → retour à la liste.
+5. Nouveau scan complet → « Enregistrement du scan… » → le détail s'ouvre
+   (« Scan du … ») ; retour → il est en tête ; Console : « fiche écrite »,
+   « photos et checkpoint supprimés ».
+6. Lancer un scan, capturer quelques secondes, **tuer l'app** (balayage dans
+   le sélecteur d'apps), relancer → Console : « dossier incomplet purgé,
+   photos comprises » ; aucun scan fantôme dans la liste.
+7. VoiceOver : une ligne est lue en une phrase ; balayer vers le haut sur
+   une ligne → action « Supprimer ». Plus grande taille de texte (Réglages →
+   Accessibilité → Affichage et taille du texte) : liste et détail lisibles.
 
 ### Étape 2 — Visionneuse intégrée et mesure point à point
 

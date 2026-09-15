@@ -19,8 +19,8 @@ traîne. On traite ces photos comme des données personnelles.
 | Fuite par le fichier exporté | 1 | STL = géométrie seule (ni photo, ni EXIF), en-tête et nom sans donnée personnelle ; fichier temporaire `.complete`, supprimé à la fermeture de la feuille de partage, dossier purgé à chaque export |
 | Fuite via les logs | 1 | `Logger` avec `privacy: .private` pour chemins et noms |
 | Saisie aberrante (calibrage) | 2 | Validation stricte (`ScaleCalibration`, déjà en place) ; analyse stricte de la cote saisie |
-| Photos orphelines d'un scan interrompu (app tuée pendant la capture) | 1 → 2 | Dossiers sans modèle purgés au lancement |
-| `scan.json` corrompu, d'une autre version ou reçu d'un autre appareil | 2 (4) | Taille bornée, `schemaVersion`, décodage validé champ par champ ; le nom n'entre jamais dans un chemin |
+| Photos orphelines d'un scan interrompu (app tuée pendant la capture) | 1 → 2 | **En place** (tranche 2, étape 1) : au premier inventaire de la session, dossiers sans modèle purgés et photos restées à côté d'un modèle supprimées (`ScanLibrary.shouldPurge`, `shouldRemoveCaptureData`) |
+| `scan.json` corrompu, d'une autre version ou reçu d'un autre appareil | 2 (4) | **En place** (tranche 2, étape 1) : lecture bornée à 64 Ko, `schemaVersion` lue en premier (version future jamais réécrite), décodage validé champ par champ, identifiant égal au dossier ; seuls les dossiers nommés par un UUID canonique sont considérés ; le nom n'entre jamais dans un chemin ni dans un journal. Tests : `ScanLibraryTests.swift` |
 | Fichier 3MF malveillant importé (**zip slip**) | 3 | Refuser tout chemin contenant `..` ou absolu lors de la décompression |
 | **Zip bomb** (fichier qui explose à la décompression) | 3 | Plafonner taille totale décompressée et nombre d'entrées |
 | XML piégé dans un 3MF (entités externes, XXE) | 3 | Désactiver la résolution d'entités externes du parseur |

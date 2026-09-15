@@ -126,6 +126,17 @@ et `.background().padding()` ne donnent pas le même rendu.
 `public` (visible hors du paquet). Dans `Scan3DCore`, tout ce que l'app
 utilise doit être `public`.
 
+## 11. `Codable` ≈ `JSON.parse` + un schéma zod
+
+- `struct Fiche: Codable { let nom: String }` : Swift génère la lecture et
+  l'écriture JSON à partir des propriétés (≈ `z.object({ nom: z.string() })`
+  inféré du type).
+- `JSONDecoder().decode(Fiche.self, from: data)` ≈
+  `schema.parse(JSON.parse(texte))` : un champ manquant ou du mauvais type
+  lève une erreur, jamais un objet à moitié rempli.
+- Pour valider davantage (longueur, plage), on écrit `init(from:)` à la
+  main ≈ `.refine()` de zod.
+
 ## Ta checklist de relecture
 
 - [ ] Je sais dire en une phrase ce que fait le fichier.

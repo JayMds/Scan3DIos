@@ -14,7 +14,10 @@ enum ScanStoreError: LocalizedError {
 }
 
 /// Gère `Application Support/Scans/` : création protégée d'un scan, espace
-/// disque disponible, suppression.
+/// disque disponible, fiches de la bibliothèque, suppression et purge.
+///
+/// Une seule instance pour toute l'app (créée par `BibliothequeModel`) :
+/// les opérations sur un même dossier passent ainsi toutes par la même file.
 ///
 /// `actor` : ses méthodes s'exécutent en série, hors du fil principal.
 /// Supprimer un scan de 1 Go ne bloque donc jamais l'interface. Analogie : un
@@ -110,6 +113,48 @@ actor ScanStore {
         guard FileManager.default.fileExists(atPath: layout.root.path(percentEncoded: false)) else { return }
         try FileManager.default.removeItem(at: layout.root)
         Logger.stockage.info("Scan \(layout.id.uuidString, privacy: .public) supprimé")
+    }
+
+    // MARK: Bibliothèque (tranche 2)
+
+    /// Dossiers de `Scans/`, classés par `ScanLibrary` (complet, sans fiche,
+    /// incomplet…). Ne supprime rien : c'est à l'appelant de décider.
+    func inventaire() throws -> [ScanLibrary.Folder] {
+        try preparerDossierScans()
+        return try ScanLibrary.inspect(scansDirectory: dossierScans)
+    }
+
+    /// Dossier sans modèle, reste d'une capture ou d'une reconstruction
+    /// interrompue : ses photos sont supprimées (`SECURITY.md`).
+    func purger(_ layout: ScanLayout) throws {
+        try FileManager.default.removeItem(at: layout.root)
+        Logger.stockage.notice("Scan \(layout.id.uuidString, privacy: .public) : dossier incomplet purgé, photos comprises")
+    }
+
+    /// Lit et valide le modèle 3D. Le calcul tourne sur la file de l'actor,
+    /// jamais sur le fil de l'interface.
+    func lireMaillage(_ layout: ScanLayout) throws(MeshError) -> Mesh {
+        try MeshLoader.load(contentsOf: layout.modelFile)
+    }
+
+    /// Mesure le modèle et écrit sa fiche : en fin de reconstruction, ou pour
+    /// récupérer un scan qui n'en a pas (tranche 1, app tuée au mauvais moment).
+    func creerFiche(pour layout: ScanLayout, nom: String, date: Date) throws -> ScanRecord {
+        let maillage = try MeshLoader.load(contentsOf: layout.modelFile)
+        let fiche = try ScanRecord(id: layout.id, name: nom, createdAt: date, mesh: maillage)
+        try ScanLibrary.write(fiche, to: layout)
+        // Des cotes d'objet ne sont pas une donnée personnelle : publiques, utiles
+        // pour comparer à la règle. Le nom, saisi par l'utilisateur, n'est jamais journalisé.
+        Logger.stockage.info(
+            "Scan \(layout.id.uuidString, privacy: .public) : fiche écrite, \(DimensionsFormatter.compact(fiche.dimensions), privacy: .public), \(fiche.triangleCount, privacy: .public) triangles, plausibles : \(fiche.dimensions.isPlausible, privacy: .public)"
+        )
+        return fiche
+    }
+
+    /// Réécrit une fiche existante (renommage, et calibrage à l'étape 3).
+    func ecrireFiche(_ fiche: ScanRecord, dans layout: ScanLayout) throws {
+        try ScanLibrary.write(fiche, to: layout)
+        Logger.stockage.info("Scan \(layout.id.uuidString, privacy: .public) : fiche mise à jour")
     }
 
     /// `Application Support` n'existe pas sur une installation neuve : on crée

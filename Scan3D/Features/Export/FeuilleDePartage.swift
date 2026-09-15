@@ -29,8 +29,8 @@ enum FeuilleDePartage {
         return true
     }
 
-    /// L'écran au premier plan : ici, le parcours de scan présenté en plein
-    /// écran par-dessus l'accueil.
+    /// L'écran au premier plan : ici, la pile de navigation qui affiche le
+    /// détail du scan.
     private static func ecranVisible() -> UIViewController? {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

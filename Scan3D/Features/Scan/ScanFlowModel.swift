@@ -21,15 +21,12 @@ enum ScanFlowError: LocalizedError {
 /// Source de vérité du parcours de scan : un store (≈ Zustand) dont les
 /// changements de phase passent par la machine à états `ScanPhase`.
 /// `@MainActor` : tout ce qu'il expose est lu par SwiftUI.
+///
+/// Depuis la tranche 2, le parcours s'arrête à l'enregistrement du scan
+/// (modèle + fiche `scan.json`) ; mesure et export vivent dans
+/// `DetailScanModel`, ouvert depuis la bibliothèque.
 @MainActor @Observable
 final class ScanFlowModel {
-    /// État de la mesure du modèle sur l'écran d'aperçu.
-    enum MesureModele: Equatable {
-        case enCours
-        case reussie(Dimensions, triangles: Int)
-        case echec
-    }
-
     private(set) var phase: ScanPhase = .preparation
     private(set) var autorisationCamera = CameraAuthorization.statut
     private(set) var layout: ScanLayout?
@@ -42,14 +39,9 @@ final class ScanFlowModel {
     private(set) var progression: Double = 0
     private(set) var tempsRestant: TimeInterval?
     private(set) var etapeReconstruction: String?
-    /// « 9,8 Mo » une fois le modèle écrit.
-    private(set) var tailleModele: String?
-    private(set) var mesure: MesureModele = .enCours
-    /// Le maillage mesuré, gardé pour l'export STL (≈ 1 Mo pour 50 k triangles).
-    private(set) var maillage: Mesh?
-    private(set) var exportEnCours = false
-    /// Non nil → l'écran d'aperçu présente une alerte.
-    private(set) var erreurExport: String?
+    /// Le scan une fois enregistré : la vue ferme alors le parcours et la
+    /// bibliothèque ouvre le détail de ce scan.
+    private(set) var scanEnregistre: ScanLayout?
     /// Vrai si l'échec vient de la reconstruction : les photos sont encore
     /// là, on peut relancer (le checkpoint accélère la reprise).
     private(set) var reprisePossible = false
@@ -59,13 +51,13 @@ final class ScanFlowModel {
     private(set) var demarrageEnCours = false
     /// Non nil → l'UI présente une alerte ; elle le remet à nil en la fermant.
     var erreur: ScanFlowError?
+    /// Début du scan : date de la fiche et nom par défaut (« Scan du … »).
+    private var debut: Date?
 
     private let store: ScanStore
-    private let exporteur: STLExporter
 
-    init(store: ScanStore = ScanStore(), exporteur: STLExporter = STLExporter()) {
+    init(store: ScanStore) {
         self.store = store
-        self.exporteur = exporteur
     }
 
     /// Vrai aussi après un échec de reconstruction : annuler effacerait les
@@ -74,8 +66,8 @@ final class ScanFlowModel {
         phase.cancellationNeedsConfirmation || reprisePossible
     }
 
-    /// Le scan est terminé : quitter garde le modèle au lieu de le supprimer.
-    var scanTermine: Bool {
+    /// Modèle reconstruit, fiche en cours d'écriture : plus rien à annuler.
+    var enregistrementEnCours: Bool {
         if case .preview = phase { true } else { false }
     }
 
@@ -111,6 +103,7 @@ final class ScanFlowModel {
 
             let nouveau = try await store.creerScan()
             layout = nouveau
+            debut = .now
             phase = suivante
             lancerCapture(pour: nouveau)
         } catch let erreurPhase as ScanPhaseError {
@@ -246,8 +239,7 @@ final class ScanFlowModel {
             reconstructor = nil
             VeilleEcran.empecher(false)
             transiter(vers: .preview(model: modele))
-            Task { await mesurerModele(modele) }
-            Task { await finaliserModele(modele) }
+            Task { await enregistrer() }
         case .echec(let message):
             reconstructor = nil
             VeilleEcran.empecher(false)
@@ -259,67 +251,28 @@ final class ScanFlowModel {
         }
     }
 
-    /// Lecture et mesure hors du fil principal : un modèle de 50 k triangles
-    /// se lit en une fraction de seconde, mais jamais au prix d'une interface figée.
-    private func mesurerModele(_ modele: URL) async {
-        mesure = .enCours
-        do {
-            let maillage = try await Task.detached(priority: .userInitiated) {
-                try MeshLoader.load(contentsOf: modele)
-            }.value
-            let dimensions = Dimensions(boundingBox: maillage.boundingBox)
-            self.maillage = maillage
-            mesure = .reussie(dimensions, triangles: maillage.triangleCount)
-            // Des cotes d'objet ne sont pas une donnée personnelle : publiques,
-            // utiles pour comparer au test à la règle.
-            Logger.reconstruction.info("Dimensions \(DimensionsFormatter.compact(dimensions), privacy: .public), \(maillage.triangleCount, privacy: .public) triangles, plausibles : \(dimensions.isPlausible, privacy: .public)")
-        } catch {
-            mesure = .echec
-            Logger.reconstruction.error("Mesure du modèle impossible : \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    // MARK: Export (écran 8)
-
-    var exportPossible: Bool { maillage != nil }
-
-    /// Écrit le STL en millimètres et renvoie son emplacement ; nil en cas
-    /// d'échec (message dans `erreurExport`).
-    func preparerExportSTL() async -> URL? {
-        guard let maillage, !exportEnCours else { return nil }
-        exportEnCours = true
-        defer { exportEnCours = false }
-        do {
-            return try await exporteur.ecrire(maillage, nom: ExportFilename.stl(date: .now))
-        } catch {
-            erreurExport = "Le fichier STL n'a pas pu être créé. Vérifiez l'espace disponible, puis réessayez."
-            Logger.export.error("Écriture du STL impossible : \(error.localizedDescription, privacy: .private)")
-            return nil
-        }
-    }
-
-    /// Feuille de partage fermée, après un partage ou une annulation : le
-    /// fichier temporaire ne doit pas rester sur l'iPhone.
-    func exportTermine(_ fichier: URL, partage: Bool) async {
-        Logger.export.info("Feuille de partage fermée, fichier partagé : \(partage, privacy: .public)")
-        await exporteur.supprimer(fichier)
-    }
-
-    func effacerErreurExport() {
-        erreurExport = nil
-    }
-
-    /// D1 : le modèle est là, les photos ne servent plus sur l'iPhone.
-    private func finaliserModele(_ modele: URL) async {
+    /// Fin du parcours : fiche du scan (cotes mesurées sur le modèle), puis
+    /// suppression des photos (décision D1), dans cet ordre — si l'app est
+    /// tuée entre les deux, la bibliothèque retire les photos au lancement.
+    /// Si la fiche échoue (modèle illisible), le modèle est gardé quand même :
+    /// la bibliothèque le montrera comme illisible, avec « Supprimer ».
+    private func enregistrer() async {
         guard let layout else { return }
-        let octets = await store.tailleFichier(modele)
-        tailleModele = ByteCountFormatter.string(fromByteCount: octets, countStyle: .file)
+        let octets = await store.tailleFichier(layout.modelFile)
         Logger.reconstruction.info("Modèle écrit : \(octets, privacy: .public) octets")
+
+        let date = debut ?? .now
+        do {
+            _ = try await store.creerFiche(pour: layout, nom: ScanRecord.defaultName(date: date), date: date)
+        } catch {
+            Logger.reconstruction.error("Fiche du scan impossible : \(String(describing: error), privacy: .private)")
+        }
         do {
             try await store.nettoyerApresReconstruction(layout)
         } catch {
             Logger.stockage.error("Nettoyage après reconstruction impossible : \(error.localizedDescription, privacy: .private)")
         }
+        scanEnregistre = layout
     }
 
     /// Transition journalisée : un refus est un bug de séquencement, pas une

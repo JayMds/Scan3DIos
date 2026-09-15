@@ -546,6 +546,130 @@ demande.
   `defer` pour relâcher l'indicateur quel que soit le chemin.
 - `Journal.swift` — catégorie `export`.
 
+## Tranche 2 — étape 1 : bibliothèque des scans
+
+Ajoutés le 15/09/2026. `ApercuView.swift` (tranche 1) devient
+`DetailScanView.swift` ; `ScanFlowModel` perd la mesure et l'export.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Library/ScanRecord.swift`
+
+**Rôle** : la fiche d'un scan (`scan.json`) — nom, date, cotes brutes,
+nombre de triangles, calibrage — et sa validation au décodage.
+
+- `Codable` écrit à la main (`init(from:)`, `encode(to:)`) ≈ un schéma zod
+  appliqué au `JSON.parse` : chaque champ est vérifié, un fichier piégé est
+  refusé au lieu de produire un objet incohérent.
+- `CodingKeys` : enum qui fixe le nom des clés JSON.
+- `public private(set) var name` : lisible partout, modifiable seulement par
+  `rename(to:)`, qui valide (≈ un setter privé).
+- `mutating func` : méthode qui modifie une `struct` (§3) ; il faut une
+  copie `var` pour l'appeler.
+- `unicodeScalars` et `properties.generalCategory` : le texte vu comme des
+  points de code Unicode, pour retirer les caractères de contrôle ;
+  `String.count` compte, lui, les caractères visibles (un émoji = 1).
+- Décodage en deux temps (`VersionSeule`, puis la fiche) : on lit la version
+  avant de supposer la structure.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Library/ScanLibrary.swift`
+
+**Rôle** : classe les dossiers de `Scans/` (complet, sans fiche, fiche
+invalide, illisible, version future, incomplet) et lit / écrit les fiches.
+
+- `enum` avec valeurs associées (`complete(ScanRecord)`,
+  `newerRecord(version:)`) : un état = un cas, chacun avec ses données (§4).
+- `do throws(ScanRecordError) { … } catch { switch error … }` : le `catch`
+  reçoit une erreur typée, le `switch` est vérifié à la compilation.
+- `FileHandle.read(upToCount:)` : lecture bornée, la taille annoncée du
+  fichier n'est jamais crue.
+- Paramètre par défaut sécurisé (`options: [.atomic, .completeFileProtection]`)
+  que seuls les tests remplacent.
+
+### `ScanLibraryTests.swift`
+
+- `struct DossierTemporaire: ~Copyable` avec `deinit` : un type **non
+  copiable** qui supprime son dossier en fin de test (≈ `afterEach`, mais
+  garanti par le compilateur).
+- Chaînes brutes `#"…"#` et interpolation `\#(valeur)` : du JSON écrit à la
+  main sans échapper les guillemets.
+- `@Test(arguments:)` sur des `Data` : un même test pour dix fichiers piégés.
+
+### Modifiés dans `Scan3DCore`
+
+- `Dimensions.swift`, `ScaleCalibration.swift` — conformes à `Codable`,
+  décodage revalidé (cote négative, facteur hors ±20 % → refus).
+  `ScaleCalibration` garde désormais les deux cotes d'origine.
+- `ScanLayout.swift` — `recordFile` (`scan.json`) ; `Hashable`, pour servir
+  de valeur de navigation.
+
+### `Scan3D/Features/Bibliotheque/BibliothequeModel.swift`
+
+**Rôle** : la liste des scans et les actions qui la modifient (charger,
+renommer, supprimer) ; au premier chargement, purge les captures
+interrompues et récupère les scans de la tranche 1.
+
+- `throws(BibliothequeErreur)` sur une méthode `async` : l'écran sait
+  exactement quelles erreurs attendre.
+- **Réentrance** : après un `await`, l'état a pu changer (la liste a été
+  rechargée) ; on recherche l'élément au lieu de réutiliser un index.
+- `Dictionary(_:uniquingKeysWith:)` plutôt que `uniqueKeysWithValues`, qui
+  arrête l'app sur une clé en double.
+
+### `Scan3D/Features/Bibliotheque/BibliothequeView.swift`
+
+**Rôle** : la liste (nom, cotes, date, « Calibré »), glisser pour
+supprimer avec confirmation, « Nouveau scan » ; vide → « Prêt à scanner ».
+
+- `NavigationLink(value:)` : la ligne pousse une **valeur** ; l'écran
+  correspondant est déclaré ailleurs (`navigationDestination`).
+- `.swipeActions` : actions de glissement, reprises automatiquement dans le
+  rotor VoiceOver.
+- `confirmationDialog(…, presenting:)` : la feuille reçoit l'élément à
+  supprimer.
+- `private struct LigneScan` : sous-composant local au fichier.
+
+### `Scan3D/Features/Bibliotheque/ScanRecord+Texte.swift`
+
+**Rôle** : dates affichées (« 15 sept. 2026 à 14:32 ») et phrase VoiceOver
+d'une ligne.
+
+- `extension` d'un type de `Scan3DCore` dans l'app : on ajoute des
+  propriétés sans toucher au paquet (≈ fonctions utilitaires colocalisées).
+- `Date.FormatStyle(date:time:locale:)` : format de date localisé.
+
+### `Scan3D/Features/DetailScan/DetailScanModel.swift`
+
+**Rôle** : lecture du maillage et export STL d'un scan (repris de
+`ScanFlowModel`).
+
+- Même structure que les autres modèles `@MainActor @Observable` ; le
+  maillage est lu par `ScanStore` (hors du fil de l'interface).
+
+### `Scan3D/Features/DetailScan/DetailScanView.swift`
+
+**Rôle** : cotes, « Voir en 3D », « Exporter en STL », renommer (alerte
+avec champ texte), supprimer (confirmation).
+
+- `init` + `_model = State(initialValue:)` : un `@State` qui dépend d'un
+  paramètre (≈ `useState(() => …)`).
+- `.alert { TextField … }` : saisie dans une alerte ; `.onChange(of:)` borne
+  la longueur pendant la frappe.
+- `@State ficheFigee` : garde le contenu affiché pendant l'animation de
+  retour après une suppression.
+
+### Modifiés à l'étape 1
+
+- `AccueilView.swift` — `NavigationStack(path: $chemin)` : la pile de
+  navigation est un tableau d'état ; `.navigationDestination(for:)` ;
+  `.fullScreenCover(…, onDismiss:)` pour ouvrir le détail une fois le
+  parcours refermé.
+- `ScanFlowView.swift` — `init(store:termine:)` et rappel `termine` (≈ une
+  prop `onDone`) ; se ferme seul quand `scanEnregistre` change.
+- `ScanFlowModel.swift` — `enregistrer()` : fiche puis nettoyage des photos.
+- `ScanStore.swift` — `inventaire()`, `purger(_:)`, `lireMaillage(_:)`,
+  `creerFiche(pour:nom:date:)`, `ecrireFiche(_:dans:)`.
+- `PreparationView.swift` (aperçu Xcode), `FeuilleDePartage.swift`
+  (commentaire).
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

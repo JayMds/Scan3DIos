@@ -89,6 +89,6 @@ struct PreparationView: View {
 
 #Preview {
     NavigationStack {
-        PreparationView(model: ScanFlowModel())
+        PreparationView(model: ScanFlowModel(store: ScanStore()))
     }
 }

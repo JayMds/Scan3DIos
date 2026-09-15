@@ -25,8 +25,8 @@ imprimante 3D et savent s'en servir.
 
 - **Tranches verticales** : chaque tranche livre une app fonctionnelle de bout
   en bout. Feuille de route : `docs/ROADMAP.md`. Tranche 1 validée le
-  15/09/2026 (bilan et points ouverts : `docs/BILAN-TRANCHE-1.md`) ; la
-  tranche 2 reste à spécifier.
+  15/09/2026 (bilan et points ouverts : `docs/BILAN-TRANCHE-1.md`).
+  Tranche en cours : `docs/TRANCHE-2.md` (plan : `docs/TRANCHE-2-PLAN.md`).
 - Commence chaque tâche non triviale en **mode plan** : liste les fichiers
   touchés et les risques avant de coder.
 - Petits commits atomiques, message en français, préfixe conventionnel
@@ -38,7 +38,9 @@ imprimante 3D et savent s'en servir.
 - RealityKit : `ObjectCaptureSession` + `ObjectCaptureView` (capture guidée),
   `PhotogrammetrySession` (reconstruction).
 - Model I/O (`MDLAsset`) pour les conversions de maillage (USDZ → STL).
-- SwiftData pour la bibliothèque locale de scans (tranche 1+).
+- Bibliothèque locale : un fichier `scan.json` par dossier de scan, lu et
+  validé par `Scan3DCore` (décision E1 de la tranche 2 ; SwiftData écarté,
+  son API n'offrant ni protection de fichiers ni exclusion de sauvegarde).
 - Plus tard : Manifold (C++, booléens de maillages) via l'interop C++ de
   Swift ; compagnon macOS pour la reconstruction haute précision.
 - **Aucun backend, aucun cloud.** Les données restent sur l'appareil (et le

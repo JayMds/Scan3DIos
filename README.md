@@ -49,6 +49,9 @@ Puis colle le contenu de `PROMPT-DEMARRAGE.md`.
 - `docs/TRANCHE-1.md` — spec de la tranche 1 (validée)
 - `docs/TRANCHE-1-PLAN.md` — plan d'implémentation, API vérifiées, résultats des tests
 - `docs/BILAN-TRANCHE-1.md` — bilan et points ouverts
+- `docs/TRANCHE-2.md` — spec de la tranche en cours (précision)
+- `docs/TRANCHE-2-PLAN.md` — plan, API vérifiées, décisions E1-E4
+- `docs/MESURES-TRANCHE-2.md` — campagne de mesure sur 3 objets
 - `docs/VISITE-GUIDEE.md` — rôle et notions Swift de chaque fichier
 - `docs/SECURITY.md` — modèle de menaces
 - `docs/SWIFT-POUR-TS.md` — lire du Swift quand on vient de TypeScript

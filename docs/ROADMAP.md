@@ -23,12 +23,14 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
 - Calibrage par carte bancaire et par cote saisie au pied à coulisse
   (`ScaleCalibration`, déjà amorcé dans `Scan3DCore`).
 - Outil de mesure point à point sur le modèle.
-- Bibliothèque locale des scans (SwiftData).
+- Bibliothèque locale des scans (`scan.json` par dossier).
 - Point de départ mesuré (15/09/2026, boîte en carton, reconstruction
   iPhone) : app 189,2 × 163,0 × 56,8 mm contre 184 × 160 × 50 mm à la règle.
-  Écarts additifs (+3 à +7 mm), la hauteur étant la plus touchée (reste de
-  table sous l'objet suspecté) : le calibrage par facteur ne suffira pas, il
-  faudra aussi traiter la base du modèle.
+  Écarts additifs (+3 à +7 mm), la hauteur étant la plus touchée : le
+  dessous, jamais photographié, a été bouché par l'algorithme. Le calibrage
+  par facteur ne suffira pas : la hauteur fera l'objet d'un diagnostic.
+- Spec : `TRANCHE-2.md` ; plan : `TRANCHE-2-PLAN.md` (décisions E1-E4 du
+  15/09/2026) ; résultats : `MESURES-TRANCHE-2.md`.
 - **Validé quand** : l'écart mesuré entre modèle et objet réel est documenté
   sur 3 objets de référence.
 

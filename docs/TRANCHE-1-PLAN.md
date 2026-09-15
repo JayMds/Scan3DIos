@@ -102,7 +102,7 @@ cible iOS 18).
 
 | # | Incertitude | Mitigation |
 |---|-------------|------------|
-| 1 | Liste officielle des formats Model I/O non relue (page rendue en JS). Import USDZ par `MDLAsset` très probable (SceneKit, Quick Look) mais non re-vérifié. | Étape 4 : `MDLAsset.canImportFileExtension("usdz")` au runtime + spike de 10 min sur iPhone ; repli RealityKit `MeshResource.contents`. **Levée le 14/09/2026 sur Mac** : import USDZ confirmé ; Model I/O ignore `metersPerUnit` et `upAxis`, n'applique pas les transformations parentes aux sommets, et le pas des sommets varie (12 ou 32 octets). Validation finale : test à la règle sur iPhone. |
+| 1 | Liste officielle des formats Model I/O non relue (page rendue en JS). Import USDZ par `MDLAsset` très probable (SceneKit, Quick Look) mais non re-vérifié. | Étape 4 : `MDLAsset.canImportFileExtension("usdz")` au runtime + spike de 10 min sur iPhone ; repli RealityKit `MeshResource.contents`. **Levée le 14/09/2026 sur Mac** : import USDZ confirmé ; Model I/O ignore `metersPerUnit` et `upAxis`, n'applique pas les transformations parentes aux sommets, et le pas des sommets varie (12 ou 32 octets). Validation finale : test à la règle sur iPhone. **Validée le 15/09/2026 : échelle correcte (écarts additifs de +3 à +7 mm).** |
 | 2 | Texte de E174.1 confirmé via des sources tierces citant Apple. | Xcode / App Store Connect valident le manifeste à l'upload. |
 | 3 | Valeur par défaut de `Configuration.isOverCaptureEnabled` non documentée. | Fixée explicitement à `false`. |
 | 4 | Comportement réel de la reconstruction quand l'iPhone se verrouille (données protégées + app suspendue). | Scénario n° 5 de `TRANCHE-1.md` §5, à l'étape 3 : décide de la protection définitive. **Levée le 14/09/2026 : reprise automatique, `.complete` confirmé.** |
@@ -465,7 +465,7 @@ Résultats (14/09/2026) : (1) reconstruction aboutie en mode orbite ;
 (2) **reprise automatique après verrouillage** → D2 confirmée ;
 (4) **mode plateau en échec** → voir étape 2 bis.
 
-### Étape 4 — Aperçu et dimensions ✅ (14/09/2026, en attente du test iPhone)
+### Étape 4 — Aperçu et dimensions ✅ (14/09/2026)
 
 Objectif : écran Aperçu avec L × l × h en mm comme information principale,
 et visualisation 3D (D3).
@@ -535,6 +535,30 @@ boîte : même taille. (3) VoiceOver activé : à l'arrivée sur l'écran,
 entendre « Modèle prêt : … centimètres de long… ». (4) Plus grande taille de
 texte (Réglages → Accessibilité) : les cotes restent lisibles, rien n'est
 tronqué.
+
+Résultats du test à la règle (15/09/2026, boîte en carton, mode orbite) :
+
+| Cote | App | Règle | Écart |
+|------|-----|-------|-------|
+| Longueur | 189,2 mm | 184 mm | +5,2 mm (+2,8 %) |
+| Largeur | 163,0 mm | 160 mm | +3,0 mm (+1,9 %) |
+| Hauteur | 56,8 mm | 50 mm | +6,8 mm (+13,6 %) |
+
+Lecture :
+- **Échelle correcte** (fichier bien en mètres) : l'hypothèse d'unité est
+  validée.
+- Écarts **additifs**, pas proportionnels : un facteur de calibrage
+  (`ScaleCalibration`) ne les corrigerait pas.
+- Pas un effet d'orientation : une rotation autour de la verticale gonflerait
+  davantage la largeur que la longueur, c'est l'inverse qui est observé → le
+  rectangle d'aire minimale n'est pas prioritaire.
+- Longueur / largeur : cohérent avec un carton bombé et des rabats (la règle
+  mesure aux arêtes, la boîte englobante au point le plus saillant). Pour un
+  support, surestimer est le sens sûr (le jeu réglable compense) : ne pas
+  écarter les points extrêmes.
+- Hauteur : écart suspect, cause probable un reste de table (« semelle »)
+  sous l'objet, ou des rabats soulevés — à confirmer visuellement dans Quick
+  Look.
 
 ### Étape 5 — Export STL en millimètres
 

@@ -23,6 +23,11 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
   (`ScaleCalibration`, déjà amorcé dans `Scan3DCore`).
 - Outil de mesure point à point sur le modèle.
 - Bibliothèque locale des scans (SwiftData).
+- Point de départ mesuré (15/09/2026, boîte en carton, reconstruction
+  iPhone) : app 189,2 × 163,0 × 56,8 mm contre 184 × 160 × 50 mm à la règle.
+  Écarts additifs (+3 à +7 mm), la hauteur étant la plus touchée (reste de
+  table sous l'objet suspecté) : le calibrage par facteur ne suffira pas, il
+  faudra aussi traiter la base du modèle.
 - **Validé quand** : l'écart mesuré entre modèle et objet réel est documenté
   sur 3 objets de référence.
 

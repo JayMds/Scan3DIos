@@ -109,7 +109,7 @@ terminée si l'une des deux échoue.
   **RealityKit et SwiftUI** (« cannot find type in scope » sinon).
 - **Model I/O** (vérifié le 14/09/2026) : ignore `metersPerUnit` et
   `upAxis` des fichiers USD (valeurs brutes ; RealityKit = mètres, Y
-  vertical), n'applique pas les transformations parentes aux sommets
+  vertical — échelle confirmée à la règle le 15/09/2026), n'applique pas les transformations parentes aux sommets
   (`MDLTransform.globalTransform`), et le pas entre sommets varie : toujours
   lire `stride`. Toute lecture passe par `MeshLoader` de `Scan3DCore`.
 - **`.quickLookPreview`** vient du framework QuickLook : `import QuickLook`

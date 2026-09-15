@@ -118,6 +118,10 @@ terminée si l'une des deux échoue.
 - **`ShareLink` ne signale pas la fermeture** de la feuille de partage :
   pour supprimer un fichier après partage, passer par `FeuilleDePartage`
   (`UIActivityViewController` + `completionWithItemsHandler`).
+- **`.completeFileProtection` refusé sur macOS** hors du conteneur d'une
+  app (EPERM à l'écriture, constaté le 15/09/2026 dans `swift test`) : dans
+  `Scan3DCore`, les options d'écriture sont un paramètre, sécurisé par
+  défaut, que les tests remplacent par `[.atomic]`.
 - **`.quickLookPreview`** vient du framework QuickLook : `import QuickLook`
   obligatoire, SwiftUI seul ne le connaît pas.
 - **Reconstruction sur iPhone** : un seul niveau de détail, `.reduced`

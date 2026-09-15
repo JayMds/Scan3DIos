@@ -7,7 +7,10 @@ import Foundation
 /// l'objet est tourné autour de la verticale dans le fichier, longueur et
 /// largeur sont surestimées (la diagonale compte). À surveiller au test à la
 /// règle ; un rectangle d'aire minimale corrigerait ce cas si besoin.
-public struct Dimensions: Equatable, Sendable {
+///
+/// `Codable` : les cotes brutes (avant calibrage) sont enregistrées dans
+/// `scan.json` pour afficher la bibliothèque sans relire chaque modèle.
+public struct Dimensions: Equatable, Sendable, Codable {
     /// Plus grande cote horizontale.
     public let lengthMM: Double
     /// Plus petite cote horizontale.
@@ -41,6 +44,30 @@ public struct Dimensions: Equatable, Sendable {
     public var largestSideMM: Double { max(lengthMM, widthMM, heightMM) }
 
     public var isPlausible: Bool { Self.plausibleLargestSideMM.contains(largestSideMM) }
+
+    // MARK: Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case lengthMM, widthMM, heightMM
+    }
+
+    /// `scan.json` est une entrée non fiable : une cote négative ou non finie
+    /// ferait afficher (ou exporter) n'importe quoi. On refuse le fichier.
+    /// Une cote invraisemblable mais finie reste acceptée : l'écran avertit
+    /// déjà via `isPlausible`.
+    public init(from decoder: any Decoder) throws {
+        let conteneur = try decoder.container(keyedBy: CodingKeys.self)
+        let longueur = try conteneur.decode(Double.self, forKey: .lengthMM)
+        let largeur = try conteneur.decode(Double.self, forKey: .widthMM)
+        let hauteur = try conteneur.decode(Double.self, forKey: .heightMM)
+        guard [longueur, largeur, hauteur].allSatisfy({ $0.isFinite && $0 >= 0 }) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .lengthMM, in: conteneur,
+                debugDescription: "Cote négative ou non finie"
+            )
+        }
+        self.init(lengthMM: longueur, widthMM: largeur, heightMM: hauteur)
+    }
 }
 
 /// Textes des dimensions : à l'écran en millimètres (l'unité des slicers),

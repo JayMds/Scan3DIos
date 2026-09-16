@@ -67,6 +67,9 @@ struct VisionneuseView: View {
                 contenu.entities.append(model.camera)
                 contenu.entities.append(model.scene)
             }
+            // Fond neutre : un modèle clair sur du blanc serait illisible, et le
+            // dégradé donne un repère de profondeur quand l'objet tourne.
+            .background(fond)
             .gesture(toucher(taille: proxy.size))
             // `simultaneousGesture` : faire tourner et pincer restent possibles
             // sans annuler le toucher (ils ne se déclenchent pas aux mêmes moments).
@@ -81,6 +84,14 @@ struct VisionneuseView: View {
             .accessibilityLabel("Modèle 3D")
             .accessibilityHint("Après activation, touchez deux points de l'objet pour mesurer la distance qui les sépare.")
         }
+    }
+
+    private var fond: some View {
+        LinearGradient(
+            colors: [Color(.systemGray5), Color(.systemGray3)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private var panneau: some View {
@@ -105,12 +116,20 @@ struct VisionneuseView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("Effacer les points") {
-                model.effacer()
+            HStack(spacing: 12) {
+                Button("Effacer les points") {
+                    model.effacer()
+                }
+                .disabled(model.pointA == nil)
+
+                // Filet de sécurité : à force de tourner et de zoomer, on perd
+                // l'objet hors de l'écran sans savoir comment y revenir.
+                Button("Recadrer") {
+                    model.recadrer()
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(model.pointA == nil)
         }
         .frame(maxWidth: .infinity)
         .padding()

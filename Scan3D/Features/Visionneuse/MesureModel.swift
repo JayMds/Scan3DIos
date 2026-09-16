@@ -44,7 +44,8 @@ final class MesureModel {
 
     private let modele: URL
     private let marqueurs = Entity()
-    private var cadrageFait = false
+    /// Taille de la zone 3D, retenue pour pouvoir recadrer à tout moment.
+    private var ecran: SIMD2<Float>?
 
     /// Sensibilité du glissement : un balayage sur toute la largeur d'un
     /// iPhone (≈ 390 pt) fait faire un peu plus d'un demi-tour à l'objet.
@@ -131,10 +132,20 @@ final class MesureModel {
     /// Recadre une fois la taille réelle de l'écran connue (portrait, panneau
     /// du bas compris) : la distance de départ dépend de sa forme.
     func cadrer(pour taille: SIMD2<Float>) {
-        guard !cadrageFait, taille.x > 0, taille.y > 0 else { return }
-        cadrageFait = true
+        guard ecran == nil, taille.x > 0, taille.y > 0 else { return }
+        ecran = taille
         orbite.frame(radius: simd_length(maillage.boundingBox.size) / 2, aspectRatio: taille.x / taille.y)
         appliquerCamera()
+    }
+
+    /// Retour à la vue de départ : l'objet entier, de trois quarts.
+    func recadrer() {
+        orbite = OrbitCamera(framing: maillage.boundingBox)
+        if let ecran {
+            orbite.frame(radius: simd_length(maillage.boundingBox.size) / 2, aspectRatio: ecran.x / ecran.y)
+        }
+        appliquerCamera()
+        annoncer("Vue recadrée")
     }
 
     private func appliquerCamera() {
@@ -196,7 +207,7 @@ final class MesureModel {
     /// l'orientation de la surface, ils restent visibles partout.
     private func rafraichirMarqueurs() {
         marqueurs.children.removeAll()
-        let rayon = max(0.0015, maillage.boundingBox.size.max() * 0.012)
+        let rayon = max(0.002, maillage.boundingBox.size.max() * 0.015)
         if let pointA {
             marqueurs.addChild(bille(pointA, couleur: .systemYellow, rayon: rayon))
         }

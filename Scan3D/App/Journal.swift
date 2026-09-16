@@ -13,4 +13,5 @@ extension Logger {
     static let stockage = Logger(subsystem: sousSysteme, category: "stockage")
     static let reconstruction = Logger(subsystem: sousSysteme, category: "reconstruction")
     static let export = Logger(subsystem: sousSysteme, category: "export")
+    static let mesure = Logger(subsystem: sousSysteme, category: "mesure")
 }

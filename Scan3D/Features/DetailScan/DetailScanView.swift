@@ -14,6 +14,7 @@ struct DetailScanView: View {
     @State private var renommageAffiche = false
     @State private var nomSaisi = ""
     @State private var confirmerSuppression = false
+    @State private var mesureAffichee = false
     @State private var erreur: BibliothequeErreur?
     /// Fiche figée pendant la suppression : l'écran garde son contenu durant
     /// l'animation de retour, au lieu d'afficher « scan illisible ».
@@ -53,11 +54,21 @@ struct DetailScanView: View {
 
             Section {
                 Button {
+                    mesureAffichee = true
+                } label: {
+                    Label("Mesurer", systemImage: "ruler")
+                }
+                .disabled(model.maillage == nil)
+                .accessibilityHint("Ouvre le modèle en 3D pour mesurer la distance entre deux points.")
+
+                Button {
                     modeleAffiche = model.layout.modelFile
                 } label: {
                     Label("Voir en 3D", systemImage: "cube.transparent")
                 }
-                .accessibilityHint("Ouvre la visionneuse 3D, avec un mode réalité augmentée à l'échelle réelle.")
+                .accessibilityHint("Ouvre la visionneuse 3D d'iOS, avec un mode réalité augmentée à l'échelle réelle.")
+            } footer: {
+                Text("La mesure point à point donne la cote utile (épaisseur d'un bord, entraxe de deux trous) ; les cotes ci-dessus donnent l'encombrement.")
             }
 
             Section {
@@ -84,6 +95,12 @@ struct DetailScanView: View {
         // Visionneuse système : rotation, zoom, VoiceOver et mode AR à l'échelle
         // réelle fournis par iOS (décision D3 de la tranche 1).
         .quickLookPreview($modeleAffiche)
+        // Plein écran : mesurer demande toute la place possible.
+        .fullScreenCover(isPresented: $mesureAffichee) {
+            if let maillage = model.maillage {
+                VisionneuseView(maillage: maillage, modele: model.layout.modelFile)
+            }
+        }
         .task { await model.charger() }
         .alert("Renommer le scan", isPresented: $renommageAffiche) {
             TextField("Nom du scan", text: $nomSaisi)

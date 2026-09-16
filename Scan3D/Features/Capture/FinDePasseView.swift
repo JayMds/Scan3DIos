@@ -18,7 +18,7 @@ struct FinDePasseView: View {
             VStack(spacing: 12) {
                 Text("\(controller.nombrePhotos) photos prises")
                     .font(.headline)
-                Text("Une passe à une autre hauteur, ou l'objet retourné, complète les parties cachées.")
+                Text("Une passe à une autre hauteur ne déplace pas l'objet : elle est sans risque. Le retournement, lui, capte le dessous mais demande des repères visuels pour se recoller.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

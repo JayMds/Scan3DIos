@@ -28,7 +28,10 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
   iPhone) : app 189,2 × 163,0 × 56,8 mm contre 184 × 160 × 50 mm à la règle.
   Écarts additifs (+3 à +7 mm), la hauteur étant la plus touchée : le
   dessous, jamais photographié, a été bouché par l'algorithme. Le calibrage
-  par facteur ne suffira pas : la hauteur fera l'objet d'un diagnostic.
+  par facteur ne suffira pas.
+- Diagnostic de la hauteur (16/09/2026) : avec une passe « Retourner », la
+  hauteur mesurée passe de 46,0 à ≈ 50 mm pour 50 mm à la règle → pas de plan
+  de coupe, mais un conseil dans la checklist de préparation.
 - Spec : `TRANCHE-2.md` ; plan : `TRANCHE-2-PLAN.md` (décisions E1-E4 du
   15/09/2026) ; résultats : `MESURES-TRANCHE-2.md`.
 - **Validé quand** : l'écart mesuré entre modèle et objet réel est documenté

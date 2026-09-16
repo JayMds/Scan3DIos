@@ -277,17 +277,34 @@ Accessibilité : champ étiqueté avec l'unité ; erreur annoncée ; facteur et 
 Test iPhone : calibrer la boîte sur sa longueur (184) → cotes recalculées ; exporter → Bambu Studio
 affiche 184 mm ; réinitialiser → retour aux cotes brutes ; relancer l'app → calibrage conservé.
 
-### Étape 4 — Hauteur : diagnostic, puis plan de coupe si confirmé
+### Étape 4 — Hauteur : diagnostic fait le 16/09/2026 → **pas de plan de coupe**
 
-Diagnostic (Jinkuro, avec l'outil d'étape 2) : scanner la boîte **sans** puis **avec** passe
-« Retourner » ; mesurer la hauteur en 3 points sur chaque modèle ; comparer à 50 mm.
-Décision (consignée dans `TRANCHE-2-PLAN.md`) :
-- **Fond trop bas de façon systématique** → plan de coupe : Core `Mesh.clipped(belowHeightMeters:)`
-  (triangles sous le plan supprimés, triangles traversants découpés ; fond laissé ouvert) + tests ;
-  App : réglage « Retirer X mm en bas » visualisé par un plan translucide dans la visionneuse,
-  `cutHeightMM` dans `scan.json`, appliqué aux cotes et à l'export.
-- **Sinon** → conseil seulement : ligne « retournez l'objet pour scanner le dessous » dans la
-  checklist de préparation ; aucun code de coupe.
+Diagnostic (Jinkuro, boîte en carton, outil de mesure de l'étape 2) :
+
+| Modèle | Hauteur point à point | Boîte englobante | Règle |
+|--------|----------------------|------------------|-------|
+| Sans passe « Retourner » | 46,0 mm (46,0 / 46,9 / 45,0) | 56,8 mm | 50 mm |
+| Avec passe « Retourner » | **≈ 50 mm** aux 3 points | polluée par des artefacts | 50 mm |
+
+**Décision : aucun plan de coupe.** L'écart de hauteur ne venait pas d'un défaut
+que le code devrait rattraper, mais d'une **face jamais photographiée** que
+l'algorithme comblait. Dès que le dessous est capté, la hauteur tombe juste. Un
+`Mesh.clipped(belowHeightMeters:)` aurait masqué le symptôme en rabotant un fond
+inventé, sans rien apprendre à l'utilisateur.
+
+Ce qui est livré à la place (16/09/2026) :
+- `Features/Scan/PreparationView.swift` — quatrième point dans la checklist :
+  « Prévoir de retourner l'objet », avec le pourquoi (le dessous n'est jamais
+  photographié) et la condition (coller des repères sur un objet uni).
+- `Features/Capture/FinDePasseView.swift` — le texte explique l'ordre des
+  passes : celles « à une autre hauteur » ne déplacent pas l'objet et sont sans
+  risque, le retournement capte le dessous mais demande des repères.
+
+Limite constatée, à garder en tête pour la tranche 3 : sur un carton uni, la
+passe retournée s'est recollée avec un décalage et a laissé des **voiles plats
+le long des arêtes**, qui faussent la boîte englobante (pas les mesures point à
+point sur zones propres). Les repères visuels sont donc une condition, pas un
+conseil de confort.
 
 ### Étape 5 — Campagne de mesure (validation de la tranche)
 

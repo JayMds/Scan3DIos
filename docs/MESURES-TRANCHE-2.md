@@ -46,7 +46,7 @@ Diagnostic de la hauteur (étape 4) :
 | Modèle | Hauteur point 1 | Point 2 | Point 3 | Moyenne | Écart à la règle |
 |--------|-----------------|---------|---------|---------|------------------|
 | Sans retournement | 46,0 | 46,9 | 45,0 | 46,0 | −4,0 |
-| Avec retournement | | | | | |
+| Avec retournement | ≈ 50 | ≈ 50 | ≈ 50 | ≈ 50 | ≈ 0 |
 
 Observations (16/09/2026) :
 
@@ -63,8 +63,23 @@ Observations (16/09/2026) :
   précision de visée à retenir, mesures prises sans zoomer.
 - Écart entre les deux méthodes sur la hauteur : **10,8 mm**, soit la
   matière « invisible » ajoutée sous l'objet (fond jamais photographié) plus
-  l'arrondi des deux surfaces touchées. À comparer avec un scan **avec**
-  passe « Retourner » : c'est le diagnostic qui décidera du plan de coupe.
+  l'arrondi des deux surfaces touchées.
+
+**Scan avec passe « Retourner » (16/09/2026)** : hauteurs mesurées point à
+point **autour de 50 mm** (valeurs exactes non relevées), contre 46,0 sans
+retournement, pour 50 mm à la règle. Le dessous photographié suffit donc à
+corriger la hauteur : **pas de plan de coupe** (décision E4 tranchée, voir
+`TRANCHE-2-PLAN.md`, étape 4).
+
+Revers de la médaille, visible dans la visionneuse et sur le modèle ouvert au
+Mac : ce scan retourné porte des **voiles plats le long des arêtes du dessus**
+et une échancrure sur un flanc — le deuxième tour s'est recollé avec un léger
+décalage. Le carton est uni : trop peu de motifs pour aligner les deux passes.
+Ces voiles dépassent de l'objet, donc ils **polluent la boîte englobante** de
+ce scan, alors que les mesures point à point sur les zones propres restent
+valables. D'où le conseil ajouté à la checklist de préparation : coller
+quelques repères (adhésif de couleur, marqueur) avant de retourner un objet
+uni, et préférer les passes « autre hauteur », qui ne déplacent pas l'objet.
 
 ## Objet 3 — Interphone Wi-Fi
 

@@ -107,6 +107,11 @@ terminée si l'une des deux échoue.
   14/09/2026) : iPhone fixe + objet qui tourne → nuage de points incohérent,
   reconstruction en échec, même sans checkpoint ni capture automatique. Le
   plateau passe par des photos simples avec profondeur (tranche 4).
+- **Passe « Retourner » et objets unis** (testé le 16/09/2026) : sans repères
+  visuels (adhésif de couleur, marqueur), les deux passes se recollent avec un
+  décalage et laissent des **voiles plats le long des arêtes**, qui faussent la
+  boîte englobante. Les passes « à une autre hauteur » ne déplacent pas
+  l'objet : elles sont sans risque, autant les privilégier.
 - **Cross-import overlay** : `ObjectCaptureSession`, `ObjectCaptureView` et
   `ObjectCapturePointCloudView` n'existent que dans un fichier qui importe
   **RealityKit et SwiftUI** (« cannot find type in scope » sinon).

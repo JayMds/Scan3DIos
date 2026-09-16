@@ -93,11 +93,13 @@ calibrage. L'écran d'aperçu de la tranche 1 devient l'écran de détail.
 
 ### Hauteur (décision E4)
 
-Diagnostic d'abord : même boîte scannée sans puis avec passe « Retourner »,
-hauteur mesurée en 3 points sur chaque modèle. Seulement si le fond se
-révèle systématiquement trop bas : plan de coupe (triangles sous le plan
-supprimés, traversants découpés), appliqué aux cotes et à l'export. Sinon,
-un conseil dans la checklist de préparation suffit.
+Diagnostic fait le 16/09/2026 : la même boîte, scannée sans puis avec passe
+« Retourner », mesure 46,0 mm puis **≈ 50 mm** en hauteur, pour 50 mm à la
+règle. L'écart venait donc d'une face jamais photographiée, pas d'un défaut à
+rattraper par le code : **pas de plan de coupe**. À la place, la checklist de
+préparation explique qu'il faut retourner l'objet, et qu'un objet uni doit
+d'abord recevoir des repères visuels (sinon les deux passes se recollent mal
+et laissent des voiles le long des arêtes).
 
 ## 3. Sécurité (voir aussi `SECURITY.md`)
 
@@ -157,5 +159,6 @@ Options étudiées et plan d'étapes : `TRANCHE-2-PLAN.md`.
 - [x] E2 Calibrage : **par scan**.
 - [x] E3 Visionneuse et mesure : **`RealityView` + intersection calculée
       dans `Scan3DCore`**.
-- [x] E4 Hauteur : **diagnostic d'abord**, plan de coupe seulement si
-      mesuré.
+- [x] E4 Hauteur : **diagnostic d'abord** — fait le 16/09/2026, conclusion :
+      pas de plan de coupe, un conseil dans la checklist (le dessous doit être
+      photographié).

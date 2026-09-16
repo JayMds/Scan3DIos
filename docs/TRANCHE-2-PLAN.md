@@ -164,32 +164,89 @@ Test iPhone :
    une ligne → action « Supprimer ». Plus grande taille de texte (Réglages →
    Accessibilité → Affichage et taille du texte) : liste et détail lisibles.
 
-### Étape 2 — Visionneuse intégrée et mesure point à point
+### Étape 2 — Visionneuse intégrée et mesure point à point — livrée le 16/09/2026, test iPhone en attente
 
-Core (`Measure/`) :
-- `Ray.swift`, `MeshPicking.swift` — `Mesh.firstIntersection(with: Ray) -> MeshHit?`
-  (Möller-Trumbore : point, triangle, distance le long du rayon) ; `SegmentMeasurement` (deux points →
-  distance en mm via `Units`, calibrage appliqué à l'étape 3).
-- Tests : rayon vers une face du cube (point attendu), rayon qui manque, rayon parallèle, face la plus
-  proche retenue, deux coins opposés du cube de 50 mm → 70,7 mm, arête → 50 mm, performance 50 k
-  triangles.
+**Écart au plan, assumé** : le plan passait par `ray(through:in:to:)` de RealityKit
+(incertitude 1). Vérification dans le SDK : cette méthode existe bien sur
+`RealityViewCameraContent` **et** sur `EntityTargetValue`, mais l'utiliser
+imposait une forme de collision et un geste ciblé sur l'entité, et laissait la
+caméra aux contrôles système (donc hors de portée des tests). Choix retenu :
+**piloter la caméra nous-mêmes**. La même caméra sert au rendu (un
+`PerspectiveCamera` RealityKit) et au calcul du rayon (`OrbitCamera` dans
+`Scan3DCore`) ; tout le calcul se teste sur Mac. `.realityViewCameraControls`
+n'est pas utilisé ; les gestes (tourner, zoomer) sont à nous.
+
+Core (`Sources/Scan3DCore/Measure/`) :
+- `Ray.swift` — demi-droite validée (`init?` refuse une direction nulle ou non
+  finie), direction normalisée : les distances sont donc des mètres.
+- `MeshPicking.swift` — `Mesh.firstIntersection(with:) -> MeshHit?`
+  (Möller-Trumbore, **double face** car un scan a des triangles retournés et des
+  trous ; garde le contact positif le plus proche ; lecture par pointeurs non
+  vérifiés, les indices ayant déjà été validés par `Mesh.init`).
+- `OrbitCamera.swift` — cible, azimut, élévation (bornée avant la verticale),
+  distance (bornée) ; `init(framing:)` cadre une boîte englobante ;
+  `ray(throughViewPoint:viewSize:)` et `project(_:viewSize:)`.
+- `SegmentMeasurement.swift` — distance A-B en mètres et en millimètres, milieu.
+- Tests (`MeasureTests.swift`, 4 suites, 22 tests) : rayon normalisé et refusé,
+  face avant / à côté / vers l'arrière / depuis l'intérieur / parallèle /
+  triangle dégénéré, pose de la caméra, cadrage vérifié en projetant les 8 coins,
+  rayon central, ouverture verticale, aller-retour projection → rayon, bornes,
+  valeurs non finies, 70,7 mm et 50 mm sur le cube, et une mesure **de bout en
+  bout** (caméra → rayon → intersection → 50,0 mm).
 
 App (`Features/Visionneuse/`) :
-- `VisionneuseView.swift` — **essai en tête d'étape** (incertitudes 1-3) : `RealityView`,
-  `Entity(contentsOf:)` à racine identité, `cameraTarget` au centre de la boîte englobante,
-  `.realityViewCameraControls(.orbit)` ; toucher → point 2D mémorisé → rayon dans `update` →
-  `Mesh.firstIntersection` ; marqueurs A et B (petites sphères) et segment ; distance en surimpression
-  SwiftUI (pas d'étiquette 3D).
-- `MesureModel.swift` — points A/B, distance, effacer ; annonces VoiceOver (« Point A posé »,
-  « Distance : 18,4 centimètres »).
-- `DetailScanView` : bouton « Mesurer » → visionneuse plein écran ; Quick Look conservé pour l'AR.
+- `MesureModel.swift` — possède la scène RealityKit : modèle chargé par
+  `Entity(contentsOf:)` puis **recalé** sur la boîte englobante du maillage,
+  caméra, lumière solidaire de la caméra, marqueurs A (jaune) / B (bleu) et
+  trait. Toucher → rayon → intersection → point posé ; troisième toucher =
+  nouvelle mesure ; annonces VoiceOver ; distance journalisée.
+- `VisionneuseView.swift` — `RealityView` sur fond dégradé, glisser pour
+  tourner, pincer pour zoomer, toucher pour poser, boutons « Effacer les
+  points » et « Recadrer », distance en grand dans le panneau du bas.
+- `DetailScanView.swift` — bouton « Mesurer » (plein écran) au-dessus de
+  « Voir en 3D » ; `Journal.swift` — catégorie `mesure`.
 
-Sécurité : aucune donnée nouvelle ; lecture du modèle déjà validée par `MeshLoader`.
-Accessibilité : `.accessibilityDirectTouch(options: .requiresActivation)` sur la vue 3D ; résultat
-toujours en texte ; limite assumée et documentée : poser un point précis reste un geste visuel.
-Test iPhone : faire tourner le modèle ; toucher deux coins d'une grande arête du dessus → distance à
-comparer à la règle (184 mm) et à la boîte englobante (189,2 mm) ; mesurer la hauteur en 3 endroits
-(données pour l'étape 4).
+**Banc d'essai (16/09/2026, simulateur iPhone 17 Pro)** : l'app a été lancée
+avec deux touchers automatiques à des coordonnées connues de la zone 3D, puis
+une capture d'écran a été comparée à ces coordonnées.
+
+| Incertitude du plan | Résultat |
+|---|---|
+| 1. Obtenir un rayon depuis un toucher | ✅ Les repères A et B tombent **exactement** sous les points touchés (35 % / 52 % et 68 % / 58 % de la zone 3D), sans forme de collision ni geste ciblé. |
+| 2. Même repère RealityKit / Model I/O | ✅ Facteur journalisé **1,000000** sur un USD en mètres (le cas de la reconstruction) ; **100** sur un fichier déclaré en centimètres, où le recalage aligne l'affichage sur le maillage mesuré. |
+| 3. Caméra virtuelle | ✅ RealityKit rend depuis notre `PerspectiveCamera` ajoutée à la scène (`content.camera = .virtual`), lumière comprise. |
+| 4. Temps d'intersection | ✅ 6,8 ms pour 51 200 triangles, pire cas, **sans optimisation** (objectif : < 20 ms). |
+
+Découverte annexe : un `.usda` **exporté par Model I/O** se charge (géométrie et
+matériau lus, mesurable) mais **ne s'affiche pas** dans RealityKit ; un USD écrit
+à la main ou produit par la reconstruction s'affiche normalement. Noté dans
+`CLAUDE.md` — à se rappeler si l'on écrit des fichiers 3D en tranche 3.
+
+Sécurité : aucune donnée nouvelle, aucune permission, aucun accès à la caméra de
+l'iPhone (rendu virtuel) ; le modèle affiché est celui déjà validé par
+`MeshLoader` ; seule la distance mesurée est journalisée (ce n'est pas une donnée
+personnelle).
+Accessibilité : `accessibilityDirectTouch(options: .requiresActivation)` sur la
+zone 3D (VoiceOver garde ses gestes tant que l'utilisateur n'a pas activé la
+zone), annonces « Point A posé », « Point B posé. Distance : … », « Aucun point
+du modèle à cet endroit », « Vue recadrée » ; distance toujours écrite en toutes
+lettres dans le panneau. Limite assumée : viser un point précis reste un geste
+visuel.
+
+Test iPhone :
+1. Un scan → « Mesurer » : le modèle apparaît entier, de trois quarts, sur fond
+   gris. Console (`reconstruction`) : « échelle RealityKit / maillage = 1.0 »
+   (toute autre valeur est à me signaler).
+2. Glisser pour tourner, pincer pour zoomer, « Recadrer » pour revenir.
+3. Toucher les deux coins d'une grande arête du dessus de la boîte : comparer à
+   la règle (184 mm) et à la boîte englobante (189,2 mm). Console (`mesure`) :
+   « Mesure A-B : … mm ».
+4. Mesurer la **hauteur en 3 endroits** (bord, milieu, autre bord) : ce sont les
+   chiffres du diagnostic de l'étape 4.
+5. Toucher à côté de l'objet : rien ne se pose.
+6. VoiceOver : la zone 3D demande une activation (double toucher) ; vérifier les
+   annonces à chaque point.
+7. Plus grande taille de texte : le panneau du bas reste lisible.
 
 ### Étape 3 — Calibrage par scan
 

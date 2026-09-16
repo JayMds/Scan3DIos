@@ -70,11 +70,15 @@ calibrage. L'écran d'aperçu de la tranche 1 devient l'écran de détail.
 
 ### Visionneuse et mesure point à point (décision E3)
 
-- `RealityView` (iOS 18) : modèle chargé par `Entity(contentsOf:)`, racine à
-  l'identité, caméra en orbite autour du centre de la boîte englobante.
-- Toucher → rayon (`ray(through:in:to:)`) → intersection avec le `Mesh` dans
-  `Scan3DCore` (algorithme de Möller-Trumbore) : le point mesuré vient de la
-  même géométrie que les cotes, le calibrage et l'export.
+- `RealityView` (iOS 18) : modèle chargé par `Entity(contentsOf:)` puis
+  **recalé sur la boîte englobante du maillage** (RealityKit applique
+  `metersPerUnit`, Model I/O l'ignore) ; le repère de la scène est donc celui du
+  maillage.
+- Caméra en orbite autour du centre de l'objet, pilotée par `OrbitCamera`
+  (`Scan3DCore`) : la même pose sert au rendu et au calcul du rayon.
+- Toucher → rayon → intersection avec le `Mesh` dans `Scan3DCore` (algorithme de
+  Möller-Trumbore) : le point mesuré vient de la même géométrie que les cotes,
+  le calibrage et l'export.
 - Deux marqueurs A et B, un segment, la distance en millimètres en
   surimpression SwiftUI.
 

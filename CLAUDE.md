@@ -115,6 +115,20 @@ terminée si l'une des deux échoue.
   vertical — échelle confirmée à la règle le 15/09/2026), n'applique pas les transformations parentes aux sommets
   (`MDLTransform.globalTransform`), et le pas entre sommets varie : toujours
   lire `stride`. Toute lecture passe par `MeshLoader` de `Scan3DCore`.
+- **RealityKit applique `metersPerUnit`, Model I/O l'ignore** (mesuré le
+  16/09/2026 : facteur 100 sur un fichier déclaré en centimètres, 1,0 sur un
+  fichier en mètres comme ceux de la reconstruction). Toute vue 3D qui sert à
+  **mesurer** doit donc recaler l'entité affichée sur la boîte englobante du
+  `Mesh` (voir `MesureModel.recaler`), et journaliser le facteur.
+- **Un `.usda` exporté par Model I/O ne s'affiche pas dans RealityKit** (vérifié
+  le 16/09/2026) : l'entité se charge, sa géométrie et son matériau sont lus,
+  mais rien n'est rendu. Un USD écrit à la main ou produit par
+  `PhotogrammetrySession` s'affiche normalement. Ne pas s'en servir comme
+  référence d'affichage.
+- **Vérifier une vue 3D sans iPhone** : lancer l'app dans le simulateur avec un
+  argument de lancement qui déclenche des touchers à des coordonnées connues,
+  puis comparer une capture (`xcrun simctl io … screenshot`) à ces coordonnées.
+  C'est ainsi que la mesure point à point a été validée avant le test terrain.
 - **`ShareLink` ne signale pas la fermeture** de la feuille de partage :
   pour supprimer un fichier après partage, passer par `FeuilleDePartage`
   (`UIActivityViewController` + `completionWithItemsHandler`).

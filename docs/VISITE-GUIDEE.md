@@ -670,6 +670,95 @@ avec champ texte), supprimer (confirmation).
 - `PreparationView.swift` (aperçu Xcode), `FeuilleDePartage.swift`
   (commentaire).
 
+## Tranche 2 — étape 2 : visionneuse et mesure point à point
+
+Ajoutés le 16/09/2026. La caméra, le rayon et l'intersection sont dans
+`Scan3DCore` : c'est ce qui rend la mesure testable sur Mac.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/Ray.swift`
+
+**Rôle** : une demi-droite (œil + direction) dans le repère du maillage.
+
+- `init?` : un initialiseur qui peut échouer (direction nulle ou non finie).
+  ≈ une fonction qui renvoie `null` plutôt que de laisser passer un `NaN`.
+- Direction normalisée une fois pour toutes : les distances renvoyées sont
+  ensuite directement des mètres.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/MeshPicking.swift`
+
+**Rôle** : `Mesh.firstIntersection(with:)` — où le rayon touche la surface,
+par l'algorithme de Möller-Trumbore.
+
+- `extension Mesh` : on ajoute une méthode à un type existant, dans un autre
+  fichier (≈ étendre un objet sans le modifier).
+- `withUnsafeBufferPointer` : parcours du tableau **sans vérification de
+  bornes**, légitime ici car `Mesh.init` a déjà validé chaque indice. C'est
+  l'exception qui confirme la règle : on ne coupe les contrôles qu'après les
+  avoir faits ailleurs.
+- `simd_cross`, `simd_dot` : produits vectoriel et scalaire.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/OrbitCamera.swift`
+
+**Rôle** : la caméra qui tourne autour de l'objet, et la conversion
+« point de l'écran → rayon » (et l'inverse).
+
+- `struct` avec `private(set) var` : la pose se modifie par des méthodes
+  (`turn`, `zoom`, `frame`) qui bornent les valeurs, jamais en écrivant
+  directement dans les champs.
+- `mutating func` sur une valeur (§3), trigonométrie `sin` / `cos` / `tan`.
+- Tuple nommé renvoyé par `basis` : `(forward:, right:, up:)`.
+- `SIMD2<Float>` pour les points d'écran : le paquet reste indépendant de
+  CoreGraphics (donc utilisable tel quel sur Mac en tranche 4).
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/SegmentMeasurement.swift`
+
+**Rôle** : la distance entre les deux points posés, en mm.
+
+### `MeasureTests.swift`
+
+- Un test **de bout en bout** dans `Scan3DCore` : caméra cadrée sur un cube,
+  rayon au centre de l'écran, intersection, puis demi-tour et nouvelle
+  mesure → 50,0 mm. Toute la chaîne de mesure est vérifiée sans iPhone.
+- Test de performance avec `ContinuousClock.now` et une grille de 51 200
+  triangles (6,8 ms, sans optimisation).
+- `#require` ne s'imbrique pas : chaque valeur optionnelle se déballe sur sa
+  propre ligne (erreur « recursive expansion of macro » sinon).
+
+### `Scan3D/Features/Visionneuse/MesureModel.swift`
+
+**Rôle** : la scène RealityKit (modèle recalé, caméra, lumière, marqueurs) et
+l'état de la mesure.
+
+- **Entités RealityKit** : des objets de référence qu'on modifie en place
+  (`camera.look(at:from:)`, `marqueurs.children.removeAll()`), à l'opposé
+  d'une vue SwiftUI recalculée à chaque rendu.
+- `ModelEntity(mesh: .generateSphere(radius:), materials: [UnlitMaterial(…)])`
+  — un matériau « non éclairé » garde sa couleur quel que soit l'angle.
+- `simd_quatf(from:to:)` pour orienter le trait, avec le cas « exactement à
+  l'opposé » traité à part (sinon le quaternion renvoie des `NaN`).
+- `switch (pointA, pointB)` sur un **tuple d'optionnels** : les trois cas
+  (premier point, second point, nouvelle mesure) en une seule expression.
+
+### `Scan3D/Features/Visionneuse/VisionneuseView.swift`
+
+**Rôle** : la `RealityView`, les gestes et le panneau de résultat.
+
+- `RealityView { contenu in … }` : la fermeture reçoit la scène une fois, à
+  l'ouverture ; tout le reste se pilote par les entités.
+- Trois gestes composés : `.gesture(toucher)`, puis deux
+  `.simultaneousGesture` (tourner, zoomer) pour qu'aucun n'annule les autres.
+- Un glissement donne une translation **absolue** depuis son début : on
+  mémorise la précédente pour en déduire le déplacement (même chose pour le
+  pincement).
+- `.accessibilityDirectTouch(options: .requiresActivation)` : VoiceOver garde
+  ses gestes tant que l'utilisateur n'a pas activé la zone 3D.
+
+### Modifiés à l'étape 2
+
+- `DetailScanView.swift` — bouton « Mesurer » et `fullScreenCover` vers la
+  visionneuse.
+- `Journal.swift` — catégorie `mesure`.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

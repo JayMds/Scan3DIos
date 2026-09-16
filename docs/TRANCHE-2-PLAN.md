@@ -248,6 +248,14 @@ Test iPhone :
    annonces à chaque point.
 7. Plus grande taille de texte : le panneau du bas reste lisible.
 
+**Résultats (16/09/2026, boîte en carton de la tranche 1, sans retournement)** :
+mesure point à point de la grande arête **177,9 mm** (règle 184), hauteur en
+3 points **46,0 / 46,9 / 45,0 mm** (règle 50). Les deux méthodes encadrent la
+vérité et l'écart est **additif** (−6,1 mm sur 184, −4,0 mm sur 50), ce qui
+confirme qu'un facteur d'échelle seul ne suffira pas. Détail et analyse :
+`MESURES-TRANCHE-2.md`. Reste à faire : scan **avec** passe « Retourner »
+(diagnostic de l'étape 4), VoiceOver et grande taille de texte.
+
 ### Étape 3 — Calibrage par scan
 
 Core :

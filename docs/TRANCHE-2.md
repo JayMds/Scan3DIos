@@ -86,10 +86,16 @@ calibrage. L'écran d'aperçu de la tranche 1 devient l'écran de détail.
 
 - Facteur = cote réelle ÷ cote mesurée sur le modèle, borné à ±20 %
   (`ScaleCalibration`).
-- Référence : une cote saisie (pied à coulisse) ou la carte bancaire
-  (largeur 85,60 mm ou hauteur 53,98 mm).
-- Stocké **par scan** dans `scan.json` ; appliqué aux cotes, aux mesures et
-  à l'export STL ; réinitialisable.
+- Référence : une cote saisie (pied à coulisse, analysée par
+  `MillimeterInput`) ou la carte bancaire (85,60 mm ou 53,98 mm).
+- Stocké **par scan** dans `scan.json` ; appliqué aux cotes affichées, aux
+  mesures et à l'export STL. Les cotes **brutes** restent dans la fiche :
+  réinitialiser rétablit tout.
+- Aperçu obligatoire avant d'appliquer : facteur et nouvelles cotes.
+- Limite assumée, mesurée le 16/09/2026 : l'écart du scan est **additif** (des
+  arêtes arrondies de quelques millimètres), pas proportionnel. Un facteur
+  unique ne peut donc pas rendre justes à la fois la boîte englobante et les
+  mesures point à point — calibrer sur **ce que l'on va utiliser**.
 
 ### Hauteur (décision E4)
 

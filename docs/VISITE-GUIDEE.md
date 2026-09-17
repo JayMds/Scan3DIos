@@ -759,6 +759,68 @@ l'état de la mesure.
   visionneuse.
 - `Journal.swift` — catégorie `mesure`.
 
+## Tranche 2 — étape 3 : calibrage par scan
+
+Ajoutés le 17/09/2026. Le calibrage corrige l'**échelle** d'un scan à partir
+d'une cote connue, et se range dans `scan.json` (décision E2).
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/MillimeterInput.swift`
+
+**Rôle** : transformer une cote tapée au clavier en nombre — ou la refuser.
+
+- Une seule règle explicite plutôt que `Double(texte)`, qui accepterait
+  « 1e3 », « -0 » ou « inf ». C'est le principe de la validation d'entrée :
+  autoriser une forme connue, pas interdire une liste de formes connues.
+- `Character.isASCII` : écarte les chiffres d'autres écritures et les
+  caractères « numériques » comme ½, que `Double` ne sait pas lire.
+- `filter { !$0.isWhitespace }` : les espaces insécables du formatage
+  français (« 1 234,5 ») passent sans effort.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/CalibrationReference.swift`
+
+**Rôle** : les cotes de référence proposées (carte bancaire, deux côtés).
+
+- `enum` à valeurs brutes, `CaseIterable` : la liste se parcourt dans un
+  `ForEach` sans jamais écrire les cas à la main dans la vue.
+
+### Modifiés dans `Scan3DCore`
+
+- `Dimensions.scaled(by:)` — cotes corrigées, sans toucher aux brutes.
+- `ScanRecord.calibratedDimensions` — ce que l'écran affiche ; la fiche, elle,
+  garde les cotes brutes, donc un calibrage s'annule sans rien perdre.
+- `SegmentMeasurement.lengthMM(calibratedBy:)` — la mesure suit le calibrage.
+- `STLWriter.binaryData(for:scale:)` — le fichier exporté porte les cotes
+  affichées ; un facteur nul ou non fini lève `STLError.invalidScale`.
+
+### `Scan3D/Features/Calibrage/CalibrageView.swift`
+
+**Rôle** : la feuille de calibrage — cote de référence, aperçu, application ou
+réinitialisation.
+
+- Deux `enum` privés : `Choix` (ce que l'utilisateur sélectionne, avec une
+  valeur associée) et `Etat` (ce que l'écran peut proposer : à compléter,
+  prêt, problème). L'état est **calculé** à chaque rendu depuis la saisie,
+  jamais stocké — pas de risque qu'il se désynchronise (≈ dériver l'état plutôt
+  que le dupliquer dans un `useState`).
+- `Picker` avec `.tag(...)` sur un enum : la sélection est typée.
+- `Text("… corrige une **échelle** …")` : SwiftUI interprète le Markdown des
+  chaînes littérales.
+- `.strikethrough()` sur les anciennes cotes : l'avant/après se lit d'un coup.
+- Bouton « Appliquer » désactivé tant que l'état n'est pas `.pret` : l'erreur
+  est impossible plutôt que signalée après coup.
+
+### Modifiés à l'étape 3
+
+- `VisionneuseView.swift` — bouton « Calibrer avec cette mesure » et feuille ;
+  la distance affichée est la cote calibrée.
+- `MesureModel.swift` — porte le calibrage, expose la distance brute (pour
+  calibrer) et la distance calibrée (pour l'afficher).
+- `DetailScanView.swift` — cotes calibrées, ligne « Calibré sur … → … »,
+  réinitialisation, export à l'échelle.
+- `BibliothequeModel.swift` — `calibrer(_:_:)`, écriture de fiche factorisée
+  avec le renommage.
+- `STLExporter.swift`, `DetailScanModel.swift` — paramètre d'échelle.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

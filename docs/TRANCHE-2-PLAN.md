@@ -256,26 +256,67 @@ confirme qu'un facteur d'échelle seul ne suffira pas. Détail et analyse :
 `MESURES-TRANCHE-2.md`. Reste à faire : scan **avec** passe « Retourner »
 (diagnostic de l'étape 4), VoiceOver et grande taille de texte.
 
-### Étape 3 — Calibrage par scan
+### Étape 3 — Calibrage par scan — livrée le 17/09/2026, test iPhone en attente
 
 Core :
-- `ScaleCalibration` `Codable` (étape 1) ; `CalibrationReference` : cote saisie ou
-  `ReferenceObject.creditCard` (85,60 / 53,98 mm) ; `Dimensions.scaled(by:)` ; échelle appliquée à
-  `SegmentMeasurement` et à l'export (`STLWriter.binaryData(for:scale:)`, par défaut 1) ;
-  `MillimeterInput.parse(_:locale:)` (virgule française, refus du vide, du négatif, du non fini).
-- Tests : facteur appliqué aux cotes, à une distance et au STL (cube 50 mm × 1,02 → 51 mm), saisie
-  « 184,0 » / « 184.0 » / « abc » / « -3 », facteur hors plage refusé au décodage.
+- `MillimeterInput.swift` — analyse stricte d'une cote saisie : virgule ou
+  point, espaces (même insécables) retirés, un seul séparateur, chiffres ASCII
+  seulement, plage 0,1 à 10 000 mm. Refuse « 1e3 », « -3 », « 0 », « 184,0,0 »,
+  « 18,4mm », « ½ », « ٧ ».
+- `CalibrationReference.swift` — les deux cotes de la carte bancaire (85,60 et
+  53,98 mm), avec leurs libellés.
+- `Dimensions.scaled(by:)` ; `ScanRecord.calibratedDimensions` (les cotes
+  **brutes** restent dans la fiche : le calibrage s'annule sans rien perdre) ;
+  `SegmentMeasurement.lengthMM(calibratedBy:)` ;
+  `STLWriter.binaryData(for:scale:)` avec `STLError.invalidScale`.
+- Tests (7 saisies valides, 12 refusées, cotes et mesures calibrées,
+  références, STL du cube 50 mm × 1,02 → 51,0 mm, facteur invalide refusé) :
+  **99 tests, 20 suites**.
 
-App (`Features/Calibrage/CalibrageView.swift`) : depuis une mesure A-B, « Calibrer avec cette
-mesure » → cote réelle saisie (`.decimalPad`) ou « Carte bancaire » ; aperçu avant application
-(« facteur 0,973 → 184,0 × 158,6 × 55,3 mm ») ; Appliquer / Réinitialiser ; enregistré dans
-`scan.json` ; badge « Calibré ».
+App :
+- `Features/Calibrage/CalibrageView.swift` — feuille ouverte depuis la mesure :
+  cote saisie (`.decimalPad`) ou carte bancaire, aperçu (facteur, cotes barrées
+  puis corrigées), « Appliquer » inactif tant que la saisie ne donne rien de
+  valable, « Réinitialiser le calibrage » quand le scan en a un, et un rappel
+  honnête : le calibrage corrige une **échelle**, pas des arêtes arrondies.
+- `VisionneuseView` — bouton « Calibrer avec cette mesure » ; la distance
+  affichée et annoncée est la cote calibrée (la brute reste au journal).
+- `DetailScanView` — cotes calibrées, ligne « Calibré sur 177,9 → 184,0 mm »,
+  réinitialisation, et export STL **à l'échelle** du calibrage.
+- `BibliothequeModel.calibrer(_:_:)`, avec l'écriture de fiche factorisée avec
+  le renommage ; le badge « Calibré » existait depuis l'étape 1.
 
-Sécurité : saisie validée par `ScaleCalibration` (±20 %) et le parseur ; aucune valeur saisie ne
-peut provoquer d'arrêt.
-Accessibilité : champ étiqueté avec l'unité ; erreur annoncée ; facteur et nouvelles cotes lus en phrase.
-Test iPhone : calibrer la boîte sur sa longueur (184) → cotes recalculées ; exporter → Bambu Studio
-affiche 184 mm ; réinitialiser → retour aux cotes brutes ; relancer l'app → calibrage conservé.
+**Ce que le calibrage corrige, et ce qu'il ne corrige pas** (mesuré le
+16/09/2026) : calibrer sur une mesure point à point (177,9 → 184) rend justes
+les **mesures point à point**, mais porte la boîte englobante de 189,2 à
+195,7 mm, alors que la règle dit 184. L'inverse est vrai si l'on calibre sur la
+boîte englobante. Aucun facteur unique ne peut corriger les deux, puisque
+l'erreur est additive : **calibrer sur ce que l'on va utiliser**, c'est-à-dire
+sur une mesure point à point quand on dessine une pièce ajustée.
+
+Sécurité : la cote saisie passe par `MillimeterInput` puis par
+`ScaleCalibration` (±20 %) ; aucun facteur nul, négatif ou non fini ne peut
+exister ; l'export refuse une échelle invalide ; le calibrage enregistré dans
+`scan.json` est revalidé au décodage (étape 1).
+Accessibilité : champ étiqueté « Cote réelle en millimètres », aperçu lu en une
+phrase, messages d'erreur explicites, annonces « Calibrage appliqué » et
+« Calibrage réinitialisé ».
+Vérification visuelle (simulateur, 17/09/2026) : écran de calibrage avec la
+carte bancaire — facteur 1,019, 189,2 × 163,0 × 56,8 → 192,8 × 166,1 × 57,9 mm.
+
+Test iPhone :
+1. Mesurer la grande arête de la boîte → « Calibrer avec cette mesure » →
+   saisir 184 → l'aperçu annonce un facteur ≈ 1,034 et des cotes ≈ 195,7 ×
+   168,6 × 58,7 mm → Appliquer.
+2. Détail : les cotes affichées sont les nouvelles, la ligne « Calibré sur
+   177,9 → 184,0 mm » apparaît, la bibliothèque affiche « Calibré ».
+3. Remesurer la même arête : elle doit tomber sur 184,0 mm.
+4. Exporter en STL → dans Bambu Studio, la pièce mesure ce que l'app affiche.
+5. « Réinitialiser le calibrage » → retour aux cotes brutes ; tuer l'app et la
+   relancer → l'état est conservé dans les deux cas.
+6. Saisies refusées : « abc », « -3 », « 12000 » laissent « Appliquer »
+   inactif ; « 260 » (écart > 20 %) affiche le message d'écart.
+7. VoiceOver sur l'écran de calibrage, puis plus grande taille de texte.
 
 ### Étape 4 — Hauteur : diagnostic fait le 16/09/2026 → **pas de plan de coupe**
 

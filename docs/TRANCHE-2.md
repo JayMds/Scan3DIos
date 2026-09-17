@@ -159,7 +159,8 @@ et laissent des voiles le long des arêtes).
 
 ## 7. Décisions validées par Jinkuro (15/09/2026)
 
-Options étudiées et plan d'étapes : `TRANCHE-2-PLAN.md`.
+Options étudiées et plan d'étapes : `TRANCHE-2-PLAN.md`. Conditions de scan et
+faits mesurés sur le terrain : `GUIDE-CAPTURE.md`.
 
 - [x] E1 Stockage : **`scan.json` par dossier** (SwiftData écarté).
 - [x] E2 Calibrage : **par scan**.

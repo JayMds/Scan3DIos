@@ -30,6 +30,7 @@ on calibre sur **une** cote et on vérifie sur **les deux autres**.
    de marqueur) sur au moins trois faces, dont le dessous. Sans eux, la passe
    retournée se recolle mal (constaté le 16/09/2026 : voiles le long des
    arêtes). Nommer les faces au marqueur aide aussi à s'y retrouver.
+   Conditions de scan en détail : `GUIDE-CAPTURE.md`.
 2. **Mesurer au pied à coulisse** : longueur, largeur, hauteur, plus la cote
    utile s'il y en a une. Ce sont **ces** valeurs qui font référence — pas les
    cotes nominales, même pour une pièce imprimée.

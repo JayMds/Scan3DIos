@@ -98,7 +98,13 @@ struct DetailScanView: View {
         // Plein écran : mesurer demande toute la place possible.
         .fullScreenCover(isPresented: $mesureAffichee) {
             if let maillage = model.maillage {
-                VisionneuseView(maillage: maillage, modele: model.layout.modelFile)
+                VisionneuseView(
+                    maillage: maillage,
+                    modele: model.layout.modelFile,
+                    calibration: fiche?.calibration
+                ) { calibration in
+                    Task { await calibrer(calibration) }
+                }
             }
         }
         .task { await model.charger() }
@@ -138,7 +144,8 @@ struct DetailScanView: View {
     }
 
     private func sectionDimensions(_ fiche: ScanRecord) -> some View {
-        let dimensions = fiche.dimensions
+        // Cotes affichées = brutes corrigées du calibrage (décision E2).
+        let dimensions = fiche.calibratedDimensions
         return Section {
             Text(DimensionsFormatter.compact(dimensions))
                 .font(.title.bold())
@@ -153,6 +160,16 @@ struct DetailScanView: View {
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
+                }
+            }
+            if let calibration = fiche.calibration {
+                LabeledContent("Calibré sur") {
+                    Text("\(DimensionsFormatter.millimeters(calibration.measuredMM)) → \(DimensionsFormatter.millimeters(calibration.actualMM))")
+                }
+                .monospacedDigit()
+                .accessibilityLabel("Calibré : \(DimensionsFormatter.spokenCentimeters(calibration.measuredMM)) mesurés pour \(DimensionsFormatter.spokenCentimeters(calibration.actualMM)) réels")
+                Button("Réinitialiser le calibrage") {
+                    Task { await calibrer(nil) }
                 }
             }
         } header: {
@@ -199,7 +216,9 @@ struct DetailScanView: View {
     /// Écrit le fichier, ouvre la feuille de partage, et supprime le fichier à
     /// sa fermeture — que l'utilisateur ait partagé ou annulé.
     private func exporter() async {
-        guard let fichier = await model.preparerExportSTL() else { return }
+        // Le fichier exporté porte les cotes affichées, calibrage compris.
+        let echelle = fiche?.calibration?.factor ?? 1
+        guard let fichier = await model.preparerExportSTL(echelle: echelle) else { return }
         let ouverte = FeuilleDePartage.presenter(fichier) { partage in
             if partage {
                 AccessibilityNotification.Announcement("Fichier STL partagé").post()
@@ -208,6 +227,18 @@ struct DetailScanView: View {
         }
         if !ouverte {
             await model.exportTermine(fichier, partage: false)
+        }
+    }
+
+    /// Applique ou retire le calibrage (nil = réinitialiser).
+    private func calibrer(_ calibration: ScaleCalibration?) async {
+        do {
+            try await bibliotheque.calibrer(model.layout.id, calibration)
+            AccessibilityNotification.Announcement(
+                calibration == nil ? "Calibrage réinitialisé" : "Calibrage appliqué"
+            ).post()
+        } catch {
+            self.erreur = error
         }
     }
 

@@ -117,16 +117,29 @@ final class BibliothequeModel {
         } catch {
             throw .nomInvalide
         }
+        try await enregistrer(fiche, pour: element)
+    }
+
+    /// Applique le calibrage d'un scan, ou le retire avec `nil` (décision E2).
+    /// Les cotes brutes restent dans la fiche : l'opération est réversible.
+    func calibrer(_ id: UUID, _ calibration: ScaleCalibration?) async throws(BibliothequeErreur) {
+        guard let element = element(id), var fiche = element.fiche else { throw .enregistrement }
+        fiche.calibration = calibration
+        try await enregistrer(fiche, pour: element)
+        Logger.stockage.info("Scan \(id.uuidString, privacy: .public) : facteur de calibrage \(calibration?.factor ?? 1, privacy: .public)")
+    }
+
+    private func enregistrer(_ fiche: ScanRecord, pour element: Element) async throws(BibliothequeErreur) {
         guard fiche != element.fiche else { return }
         do {
             try await store.ecrireFiche(fiche, dans: element.layout)
         } catch {
-            Logger.stockage.error("Renommage impossible : \(error.localizedDescription, privacy: .private)")
+            Logger.stockage.error("Fiche non enregistrée : \(error.localizedDescription, privacy: .private)")
             throw .enregistrement
         }
         // Réentrance : pendant l'`await`, la liste a pu changer (rechargement,
         // suppression). On recherche l'élément au lieu de réutiliser un index.
-        if let index = elements.firstIndex(where: { $0.id == id }) {
+        if let index = elements.firstIndex(where: { $0.id == fiche.id }) {
             elements[index] = Element(layout: element.layout, fiche: fiche)
         }
     }

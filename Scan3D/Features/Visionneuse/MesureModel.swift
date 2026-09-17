@@ -33,6 +33,8 @@ final class MesureModel {
     private(set) var pointB: SIMD3<Float>?
     private(set) var mesure: SegmentMeasurement?
     private(set) var annonce: Annonce?
+    /// Calibrage du scan : la distance affichée en tient compte (décision E2).
+    private(set) var calibration: ScaleCalibration?
 
     /// Le maillage mesuré : le même que celui des cotes et de l'export STL.
     let maillage: Mesh
@@ -51,10 +53,35 @@ final class MesureModel {
     /// iPhone (≈ 390 pt) fait faire un peu plus d'un demi-tour à l'objet.
     private static let radiansParPoint: Float = 0.008
 
-    init(maillage: Mesh, modele: URL) {
+    init(maillage: Mesh, modele: URL, calibration: ScaleCalibration? = nil) {
         self.maillage = maillage
         self.modele = modele
+        self.calibration = calibration
         self.orbite = OrbitCamera(framing: maillage.boundingBox)
+    }
+
+    /// Distance à afficher : corrigée du calibrage s'il y en a un.
+    var distanceMM: Double? {
+        mesure?.lengthMM(calibratedBy: calibration)
+    }
+
+    /// Distance brute, telle que mesurée sur le maillage : c'est elle qui sert
+    /// de point de départ au calibrage.
+    var distanceBruteMM: Double? {
+        mesure?.lengthMM
+    }
+
+    /// Cotes brutes du modèle, pour l'aperçu de l'écran de calibrage.
+    var dimensionsBrutes: Dimensions {
+        Dimensions(boundingBox: maillage.boundingBox)
+    }
+
+    func appliquerCalibrage(_ nouveau: ScaleCalibration?) {
+        calibration = nouveau
+        guard let distance = distanceMM else { return }
+        annoncer(nouveau == nil
+                 ? "Calibrage réinitialisé. Distance : \(DimensionsFormatter.spokenCentimeters(distance))"
+                 : "Calibrage appliqué. Distance : \(DimensionsFormatter.spokenCentimeters(distance))")
     }
 
     // MARK: Chargement
@@ -183,10 +210,12 @@ final class MesureModel {
             pointB = point
             let segment = SegmentMeasurement(start: a, end: point)
             mesure = segment
-            annoncer("Point B posé. Distance : \(DimensionsFormatter.spokenCentimeters(segment.lengthMM))")
+            let distance = segment.lengthMM(calibratedBy: calibration)
+            annoncer("Point B posé. Distance : \(DimensionsFormatter.spokenCentimeters(distance))")
             // Une distance mesurée n'est pas une donnée personnelle : publique,
-            // c'est elle que le test terrain compare au pied à coulisse.
-            Logger.mesure.info("Mesure A-B : \(DimensionsFormatter.millimeters(segment.lengthMM), privacy: .public)")
+            // c'est elle que le test terrain compare au pied à coulisse. La cote
+            // brute est journalisée à côté de la cote calibrée.
+            Logger.mesure.info("Mesure A-B : \(DimensionsFormatter.millimeters(distance), privacy: .public) (brute : \(DimensionsFormatter.millimeters(segment.lengthMM), privacy: .public))")
         default:
             // Troisième toucher : on recommence une mesure là où l'on a touché.
             pointA = point

@@ -133,7 +133,7 @@ private struct LigneScan: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(fiche.name)
                     .font(.headline)
-                Text(DimensionsFormatter.compact(fiche.dimensions))
+                Text(DimensionsFormatter.compact(fiche.calibratedDimensions))
                     .monospacedDigit()
                 Text(fiche.sousTitre)
                     .font(.footnote)

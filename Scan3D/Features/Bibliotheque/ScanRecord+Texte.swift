@@ -22,6 +22,6 @@ extension ScanRecord {
     /// Une ligne de bibliothèque lue d'une traite par VoiceOver.
     var phraseAccessible: String {
         let calibrage = calibration == nil ? "" : ", calibré"
-        return "\(name), enregistré le \(dateLongue), \(DimensionsFormatter.spoken(dimensions))\(calibrage)"
+        return "\(name), enregistré le \(dateLongue), \(DimensionsFormatter.spoken(calibratedDimensions))\(calibrage)"
     }
 }

@@ -14,10 +14,19 @@ struct VisionneuseView: View {
     /// la caméra veut un déplacement relatif.
     @State private var derniereTranslation: CGSize = .zero
     @State private var derniereAmplitude: CGFloat = 1
+    @State private var calibrageAffiche = false
+    /// Prévient l'écran de détail du calibrage choisi (nil = réinitialiser).
+    private let onCalibrage: (ScaleCalibration?) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    init(maillage: Mesh, modele: URL) {
-        _model = State(initialValue: MesureModel(maillage: maillage, modele: modele))
+    init(
+        maillage: Mesh,
+        modele: URL,
+        calibration: ScaleCalibration? = nil,
+        onCalibrage: @escaping (ScaleCalibration?) -> Void = { _ in }
+    ) {
+        _model = State(initialValue: MesureModel(maillage: maillage, modele: modele, calibration: calibration))
+        self.onCalibrage = onCalibrage
     }
 
     var body: some View {
@@ -36,6 +45,18 @@ struct VisionneuseView: View {
         .onChange(of: model.annonce) { _, annonce in
             if let annonce {
                 AccessibilityNotification.Announcement(annonce.texte).post()
+            }
+        }
+        .sheet(isPresented: $calibrageAffiche) {
+            if let mesureMM = model.distanceBruteMM {
+                CalibrageView(
+                    mesureMM: mesureMM,
+                    dimensions: model.dimensionsBrutes,
+                    calibrationActuelle: model.calibration
+                ) { calibration in
+                    model.appliquerCalibrage(calibration)
+                    onCalibrage(calibration)
+                }
             }
         }
     }
@@ -96,15 +117,24 @@ struct VisionneuseView: View {
 
     private var panneau: some View {
         VStack(spacing: 12) {
-            if let mesure = model.mesure {
-                Text(DimensionsFormatter.millimeters(mesure.lengthMM))
+            if let distance = model.distanceMM {
+                Text(DimensionsFormatter.millimeters(distance))
                     .font(.largeTitle.bold())
                     .monospacedDigit()
-                    .accessibilityLabel("Distance entre A et B : \(DimensionsFormatter.spokenCentimeters(mesure.lengthMM))")
-                Text("Entre le point A (jaune) et le point B (bleu)")
+                    .accessibilityLabel("Distance entre A et B : \(DimensionsFormatter.spokenCentimeters(distance))")
+                Text(model.calibration == nil
+                     ? "Entre le point A (jaune) et le point B (bleu)"
+                     : "Entre A et B, cote calibrée")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
+
+                Button("Calibrer avec cette mesure") {
+                    calibrageAffiche = true
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityHint("Recale l'échelle du scan sur une cote réelle, mesurée à la main ou lue sur une carte bancaire.")
             } else {
                 Text(model.pointA == nil
                      ? "Touchez un premier point sur l'objet."

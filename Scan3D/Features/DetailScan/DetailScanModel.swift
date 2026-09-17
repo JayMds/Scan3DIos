@@ -51,12 +51,15 @@ final class DetailScanModel {
 
     /// Écrit le STL en millimètres et renvoie son emplacement ; nil en cas
     /// d'échec (message dans `erreurExport`).
-    func preparerExportSTL() async -> URL? {
+    ///
+    /// - Parameter echelle: facteur de calibrage du scan. Le fichier exporté
+    ///   porte ainsi exactement les cotes affichées à l'écran.
+    func preparerExportSTL(echelle: Double) async -> URL? {
         guard let maillage, !exportEnCours else { return nil }
         exportEnCours = true
         defer { exportEnCours = false }
         do {
-            return try await exporteur.ecrire(maillage, nom: ExportFilename.stl(date: .now))
+            return try await exporteur.ecrire(maillage, echelle: echelle, nom: ExportFilename.stl(date: .now))
         } catch {
             erreurExport = "Le fichier STL n'a pas pu être créé. Vérifiez l'espace disponible, puis réessayez."
             Logger.export.error("Écriture du STL impossible : \(error.localizedDescription, privacy: .private)")

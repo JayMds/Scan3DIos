@@ -4,6 +4,8 @@ import simd
 public enum STLError: Error, Equatable, Sendable {
     /// Le nombre de triangles ne tient pas sur 32 bits (limite du format).
     case tooManyTriangles
+    /// Facteur de calibrage nul, négatif ou non fini.
+    case invalidScale
 }
 
 /// Écrit un maillage au format STL **binaire**, en **millimètres**.
@@ -28,14 +30,17 @@ public enum STLWriter {
         headerSize + MemoryLayout<UInt32>.size + triangleRecordSize * triangleCount
     }
 
-    public static func binaryData(for mesh: Mesh) throws(STLError) -> Data {
+    /// - Parameter scale: facteur de calibrage du scan (décision E2), 1 par
+    ///   défaut. Le fichier exporté porte donc les cotes affichées à l'écran.
+    public static func binaryData(for mesh: Mesh, scale: Double = 1) throws(STLError) -> Data {
         guard let nombre = UInt32(exactly: mesh.triangleCount) else { throw .tooManyTriangles }
+        guard scale.isFinite, scale > 0 else { throw .invalidScale }
 
         var data = Data(capacity: fileSize(triangleCount: mesh.triangleCount))
         data.append(header)
         append(nombre, to: &data)
 
-        let echelle = Float(Units.metersToMillimeters)
+        let echelle = Float(Units.metersToMillimeters * scale)
         for debut in stride(from: 0, to: mesh.indices.count, by: 3) {
             // Indices garantis valides par `Mesh` : pas de vérification à refaire ici.
             let a = mesh.positions[Int(mesh.indices[debut])] * echelle

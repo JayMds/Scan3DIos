@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Scan3DCore
 
@@ -40,5 +41,61 @@ struct UnitsTests {
     func carteBancaire() {
         #expect(ReferenceObject.creditCard.widthMM == 85.60)
         #expect(ReferenceObject.creditCard.heightMM == 53.98)
+    }
+}
+
+@Suite("Saisie d'une cote en millimètres")
+struct MillimeterInputTests {
+
+    @Test("Accepte la virgule française, le point, et les espaces du formatage", arguments: [
+        ("184", 184.0), ("184,0", 184.0), ("184.0", 184.0), ("  184,0  ", 184.0),
+        ("1 234,5", 1234.5), ("1\u{00A0}234,5", 1234.5), ("0,1", 0.1), (".5", 0.5),
+    ])
+    func saisiesValides(texte: String, attendu: Double) {
+        #expect(MillimeterInput.parse(texte) == attendu)
+    }
+
+    @Test("Refuse tout le reste", arguments: [
+        "", "   ", "abc", "-3", "0", "0,05", "12000", "1e3", "184,0,0", "18,4mm", "½", "٧",
+    ])
+    func saisiesRefusees(texte: String) {
+        #expect(MillimeterInput.parse(texte) == nil)
+    }
+}
+
+@Suite("Application du calibrage")
+struct CalibrationApplicationTests {
+    static let brutes = Dimensions(lengthMM: 189.2, widthMM: 163, heightMM: 56.8)
+
+    @Test("Les cotes affichées suivent le facteur, les cotes brutes ne bougent pas")
+    func cotesCalibrees() throws {
+        let calibration = try ScaleCalibration(measuredMM: 177.9, actualMM: 184)
+        var fiche = try ScanRecord(id: UUID(), name: "Boîte", createdAt: .now,
+                                   triangleCount: 1_000, dimensions: Self.brutes)
+        #expect(fiche.calibratedDimensions == Self.brutes)
+
+        fiche.calibration = calibration
+        let corrigees = fiche.calibratedDimensions
+        #expect(abs(corrigees.lengthMM - 189.2 * calibration.factor) < 1e-9)
+        #expect(fiche.dimensions == Self.brutes)
+        // Facteur 184 / 177,9 ≈ 1,034 : la longueur affichée gagne ~6,5 mm.
+        #expect(abs(corrigees.lengthMM - 195.7) < 0.1)
+    }
+
+    @Test("Une mesure point à point se corrige du même facteur")
+    func mesureCalibree() throws {
+        let calibration = try ScaleCalibration(measuredMM: 177.9, actualMM: 184)
+        let mesure = SegmentMeasurement(start: [0, 0, 0], end: [0.1779, 0, 0])
+        // Tolérance au micron : les sommets sont des `Float`, pas des `Double`.
+        #expect(abs(mesure.lengthMM - 177.9) < 1e-3)
+        #expect(abs(mesure.lengthMM(calibratedBy: calibration) - 184) < 1e-3)
+        #expect(mesure.lengthMM(calibratedBy: nil) == mesure.lengthMM)
+    }
+
+    @Test("Les références proposées sont celles de la carte bancaire")
+    func references() {
+        #expect(CalibrationReference.creditCardWidth.actualMM == 85.60)
+        #expect(CalibrationReference.creditCardHeight.actualMM == 53.98)
+        #expect(CalibrationReference.allCases.count == 2)
     }
 }

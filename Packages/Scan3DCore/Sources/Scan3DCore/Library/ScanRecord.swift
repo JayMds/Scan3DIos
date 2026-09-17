@@ -81,6 +81,14 @@ public struct ScanRecord: Identifiable, Equatable, Sendable {
         )
     }
 
+    /// Cotes à afficher : brutes, ou corrigées si le scan a été calibré. Les
+    /// cotes brutes, elles, restent intactes dans le fichier — un calibrage
+    /// s'annule sans rien avoir perdu.
+    public var calibratedDimensions: Dimensions {
+        guard let calibration else { return dimensions }
+        return dimensions.scaled(by: calibration.factor)
+    }
+
     /// Change le nom ; refuse un nom vide ou trop long sans rien modifier.
     public mutating func rename(to nouveauNom: String) throws(ScanRecordError) {
         guard let nom = Self.sanitizedName(nouveauNom) else { throw .invalidName }

@@ -45,6 +45,11 @@ public struct Dimensions: Equatable, Sendable, Codable {
 
     public var isPlausible: Bool { Self.plausibleLargestSideMM.contains(largestSideMM) }
 
+    /// Cotes corrigées par un facteur de calibrage (décision E2).
+    public func scaled(by factor: Double) -> Dimensions {
+        Dimensions(lengthMM: lengthMM * factor, widthMM: widthMM * factor, heightMM: heightMM * factor)
+    }
+
     // MARK: Codable
 
     private enum CodingKeys: String, CodingKey {

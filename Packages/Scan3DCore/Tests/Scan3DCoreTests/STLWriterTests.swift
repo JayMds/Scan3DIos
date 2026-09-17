@@ -30,6 +30,34 @@ private struct STLRelu {
 @Suite("Export STL")
 struct STLWriterTests {
 
+    @Test("Le facteur de calibrage passe dans le fichier exporté")
+    func echelleDeCalibrage() throws {
+        let asset = MDLAsset()
+        asset.add(MDLMesh(boxWithExtent: [0.05, 0.05, 0.05], segments: [1, 1, 1],
+                          inwardNormals: false, geometryType: .triangles, allocator: nil))
+        let maillage = try MeshLoader.load(asset: asset)
+
+        let calibre = try STLRelu(try STLWriter.binaryData(for: maillage, scale: 1.02))
+        let sommets = calibre.triangles.flatMap(\.sommets)
+        // Cube de 50 mm × 1,02 = 51 mm, soit ±25,5 mm autour du centre.
+        #expect(abs((sommets.map(\.x).max() ?? 0) - 25.5) < 1e-3)
+        #expect(abs((sommets.map(\.y).min() ?? 0) + 25.5) < 1e-3)
+
+        // Sans facteur, le fichier est identique à celui de la tranche 1.
+        #expect(try STLWriter.binaryData(for: maillage) == (try STLWriter.binaryData(for: maillage, scale: 1)))
+    }
+
+    @Test("Refuse un facteur nul, négatif ou non fini", arguments: [0.0, -1.0, .nan, .infinity])
+    func facteurInvalide(echelle: Double) throws {
+        let asset = MDLAsset()
+        asset.add(MDLMesh(boxWithExtent: [0.05, 0.05, 0.05], segments: [1, 1, 1],
+                          inwardNormals: false, geometryType: .triangles, allocator: nil))
+        let maillage = try MeshLoader.load(asset: asset)
+        #expect(throws: STLError.invalidScale) {
+            _ = try STLWriter.binaryData(for: maillage, scale: echelle)
+        }
+    }
+
     @Test("Un cube de 0,05 m exporté mesure 50 mm (test obligatoire de la spec)")
     func cubeCinquanteMillimetres() throws {
         let asset = MDLAsset()

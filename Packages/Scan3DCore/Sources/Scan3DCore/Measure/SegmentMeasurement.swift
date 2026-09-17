@@ -19,10 +19,16 @@ public struct SegmentMeasurement: Equatable, Sendable {
         Double(simd_distance(start, end))
     }
 
-    /// En millimètres, l'unité affichée et exportée. Le calibrage du scan
-    /// s'appliquera ici à l'étape 3.
+    /// En millimètres, l'unité affichée et exportée — cote **brute**, avant
+    /// calibrage (voir `lengthMM(calibratedBy:)`).
     public var lengthMM: Double {
         Units.millimeters(fromMeters: lengthMeters)
+    }
+
+    /// Longueur corrigée par le calibrage du scan ; identique à `lengthMM`
+    /// tant qu'aucun calibrage n'a été appliqué.
+    public func lengthMM(calibratedBy calibration: ScaleCalibration?) -> Double {
+        calibration?.apply(toMM: lengthMM) ?? lengthMM
     }
 
     /// Milieu du segment : où poser l'étiquette ou le trait dans la scène 3D.

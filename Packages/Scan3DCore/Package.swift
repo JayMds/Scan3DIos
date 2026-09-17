@@ -8,9 +8,13 @@ let package = Package(
     platforms: [.iOS(.v18), .macOS(.v15)],
     products: [
         .library(name: "Scan3DCore", targets: ["Scan3DCore"]),
+        // Outil de développement (macOS) : écrit le cube étalon de la campagne
+        // de mesure. L'app iOS ne dépend que de la bibliothèque.
+        .executable(name: "etalon", targets: ["Etalon"]),
     ],
     targets: [
         .target(name: "Scan3DCore"),
+        .executableTarget(name: "Etalon", dependencies: ["Scan3DCore"]),
         .testTarget(name: "Scan3DCoreTests", dependencies: ["Scan3DCore"]),
     ]
 )

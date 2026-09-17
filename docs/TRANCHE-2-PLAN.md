@@ -347,14 +347,27 @@ le long des arêtes**, qui faussent la boîte englobante (pas les mesures point 
 point sur zones propres). Les repères visuels sont donc une condition, pas un
 conseil de confort.
 
-### Étape 5 — Campagne de mesure (validation de la tranche)
+### Étape 5 — Campagne de mesure (validation de la tranche) — outillage livré le 17/09/2026
 
-Trois objets : **cube imprimé de 50 mm** (étalon), **boîte en carton**, **interphone Wi-Fi** (objet
-cible de la tranche 3). Pour chacun, dans `docs/MESURES-TRANCHE-2.md` : cote physique (pied à
-coulisse), boîte englobante, mesure point à point, après calibrage. Objectif indicatif : ≤ 2 mm sur
-une mesure point à point après calibrage du cube.
+Trois objets : **cube étalon de 50 mm** (imprimé depuis notre propre STL),
+**boîte en carton**, **interphone Wi-Fi** (objet cible de la tranche 3).
 
----
+Livré :
+- `Packages/Scan3DCore/Sources/Etalon/main.swift` + produit `etalon` du paquet
+  et cible `make etalon` : écrit `build/etalon-cube-50mm.stl` (cube de 50,000 mm,
+  12 triangles, 684 octets) avec le `STLWriter` de l'app. Si la pièce imprimée
+  mesure 50,0 mm au pied à coulisse, toute la chaîne maillage → millimètres →
+  STL → slicer est prouvée.
+- `MESURES-TRANCHE-2.md` : protocole pas à pas et feuilles de relevé.
+
+**Point de méthode** : on calibre sur **une** cote (la longueur) et on vérifie
+sur **les deux autres**. Vérifier la cote qui a servi au calibrage ne prouverait
+rien — elle tombe juste par construction.
+
+À faire par Jinkuro : imprimer le cube, puis dérouler le protocole sur les trois
+objets et remplir `MESURES-TRANCHE-2.md`. Critère : écart documenté sur les 3
+objets, et une mesure point à point après calibrage du cube à **≤ 2 mm** du pied
+à coulisse.
 
 ## D. Vérification
 

@@ -35,7 +35,9 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
 - Spec : `TRANCHE-2.md` ; plan : `TRANCHE-2-PLAN.md` (décisions E1-E4 du
   15/09/2026) ; résultats : `MESURES-TRANCHE-2.md`.
 - **Validé quand** : l'écart mesuré entre modèle et objet réel est documenté
-  sur 3 objets de référence.
+  sur 3 objets de référence (cube étalon de 50 mm imprimé depuis
+  `make etalon`, boîte en carton, interphone), protocole et relevés dans
+  `MESURES-TRANCHE-2.md`.
 
 ## Tranche 3 — Générer un support
 

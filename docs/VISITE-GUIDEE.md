@@ -821,14 +821,26 @@ réinitialisation.
   avec le renommage.
 - `STLExporter.swift`, `DetailScanModel.swift` — paramètre d'échelle.
 
+### `Packages/Scan3DCore/Sources/Etalon/main.swift`
+
+**Rôle** (tranche 2, étape 5) : écrit `build/etalon-cube-50mm.stl`, le cube de
+50 mm qui sert d'étalon à la campagne de mesure.
+
+- Deuxième **cible** du paquet, exécutable celle-ci (`.executableTarget`) :
+  l'app iOS ne dépend que de la bibliothèque, l'outil ne tourne que sur Mac.
+- Un fichier `main.swift` s'exécute de haut en bas, sans `struct` ni `@main`.
+- `CommandLine.arguments` pour le chemin de sortie, `exit(1)` en cas d'échec.
+- Le cube est décrit par 8 sommets et 12 triangles, orientés dans le sens
+  trigonométrique vu de l'extérieur pour que les normales pointent dehors.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce
   dernier). `TARGETED_DEVICE_FAMILY: "1"` = iPhone seulement ;
   `UIRequiredDeviceCapabilities: [arkit]` filtre les appareils sans ARKit
   (mais pas sans LiDAR — d'où l'écran « non compatible »).
-- `Makefile` — les 4 commandes du projet ; `build-check` régénère toujours le
-  projet avant de compiler.
+- `Makefile` — les 5 commandes du projet ; `build-check` régénère toujours le
+  projet avant de compiler, `etalon` écrit le cube de calibration à imprimer.
 - `Scan3D/Resources/PrivacyInfo.xcprivacy` — manifeste App Store ; déclare
   l'API « espace disque » (raison E174.1) depuis la tranche 1.
 - `.claude/settings.json` — garde-fous : édition du `.pbxproj` interdite,

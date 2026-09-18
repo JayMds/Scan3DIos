@@ -26,7 +26,9 @@ imprimante 3D et savent s'en servir.
 - **Tranches verticales** : chaque tranche livre une app fonctionnelle de bout
   en bout. Feuille de route : `docs/ROADMAP.md`. Tranche 1 validée le
   15/09/2026 (bilan et points ouverts : `docs/BILAN-TRANCHE-1.md`).
-  Tranche en cours : `docs/TRANCHE-2.md` (plan : `docs/TRANCHE-2-PLAN.md`).
+  Tranche 2 : quatre étapes de code livrées ; la campagne de mesure
+  (`docs/MESURES-TRANCHE-2.md`) reste ouverte, faute d'imprimante.
+  Tranche en cours : `docs/TRANCHE-3.md` (plan : `docs/TRANCHE-3-PLAN.md`).
 - Commence chaque tâche non triviale en **mode plan** : liste les fichiers
   touchés et les risques avant de coder.
 - Petits commits atomiques, message en français, préfixe conventionnel
@@ -41,8 +43,12 @@ imprimante 3D et savent s'en servir.
 - Bibliothèque locale : un fichier `scan.json` par dossier de scan, lu et
   validé par `Scan3DCore` (décision E1 de la tranche 2 ; SwiftData écarté,
   son API n'offrant ni protection de fichiers ni exclusion de sauvegarde).
-- Plus tard : Manifold (C++, booléens de maillages) via l'interop C++ de
-  Swift ; compagnon macOS pour la reconstruction haute précision.
+- Géométrie des pièces générées : **construction directe en Swift** (décision
+  G1 de la tranche 3) — contours, coutures, cylindres, triangulation par
+  oreilles. Pas de booléen général, donc aucune dépendance tierce. Manifold
+  (Apache-2.0, interop C++) reste en réserve pour le jour où un booléen général
+  deviendra nécessaire.
+- Plus tard : compagnon macOS pour la reconstruction haute précision.
 - **Aucun backend, aucun cloud.** Les données restent sur l'appareil (et le
   Mac de l'utilisateur en tranche 4, via réseau local).
 - Tests : **Swift Testing** (`import Testing`, `@Test`, `#expect`), pas XCTest.

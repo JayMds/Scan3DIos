@@ -42,15 +42,21 @@ On ne commence pas la tranche N+1 tant que la tranche N n'est pas validée.
 ## Tranche 3 — Générer un support
 
 - Premier générateur paramétrique : support mural (cavité ajustée au
-  modèle + jeu réglable + trous de fixation).
-- Booléens de maillages avec Manifold (interop C++).
+  modèle + jeu réglable + trous de fixation), plus une **tranche d'essai**
+  imprimable en un quart d'heure pour régler le jeu.
+- Géométrie **construite directement en Swift** (décision G1 du 18/09/2026) :
+  pas de booléen général, donc pas de dépendance tierce. Manifold
+  (Apache-2.0) reste la solution du jour où un booléen général deviendra
+  nécessaire — l'évaluation est consignée dans `TRANCHE-3-PLAN.md`.
+- Spec : `TRANCHE-3.md` ; plan et décisions G1-G4 : `TRANCHE-3-PLAN.md`.
 
 ### Pistes de précision issues de la tranche 2 (17/09/2026)
 
 Nées des relevés de la tranche 2, à instruire au plan de la tranche 3. La
 première est **retenue sur le principe** ; les deux autres restent à trancher.
 
-1. **Mesure de face à face** (retenue) — ajuster un plan sur le voisinage du
+1. **Mesure de face à face** — **retenue, programmée en étape 1 de la
+   tranche 3** (décision G4). Ajuster un plan sur le voisinage du
    point touché (normales pondérées par l'aire, plus un test de résidu) et
    mesurer l'épaisseur entre deux plans parallèles, la distance d'un point à un
    plan, ou à défaut de point à point. Attaque **les deux** erreurs mesurées :
@@ -59,16 +65,18 @@ première est **retenue sur le principe** ; les deux autres restent à trancher.
    visible à l'écran, libellé explicite), sans sélecteur de mode — un mode
    oublié donnerait deux chiffres pour le même bord. Se teste entièrement dans
    `Scan3DCore` (cube : face → normale exacte et résidu nul ; coin → refus).
-2. **Rectangle d'aire minimale** pour la boîte englobante (à trancher) — un
+2. **Rectangle d'aire minimale** pour la boîte englobante (toujours à
+   trancher) — un
    objet posé de travers d'un seul degré explique +3 mm de largeur sur la boîte
    en carton. Question ouverte : une fois qu'on mesure de face à face, la boîte
    englobante n'est plus qu'un indicateur d'encombrement — mérite-t-elle ce
    code ?
-3. **Suppression des fragments** (à trancher) — les composantes connexes
-   détachées (miettes de table) partent sans risque ; les « voiles » d'une passe
-   retournée mal recollée, eux, sont **attachés** à l'objet et demanderaient un
-   critère de pellicule fine. Question ouverte : jusqu'où nettoyer
-   automatiquement un maillage dont on prétend donner les cotes fidèlement ?
+3. **Suppression des fragments** (partiellement réglée) — la silhouette de la
+   tranche 3 ne garde que la plus grande composante connexe **en 2D** : les
+   miettes de table et les voiles détachés ne peuvent donc plus polluer une
+   cavité, sans qu'on touche au maillage mesuré. Reste ouverte la question du
+   nettoyage du maillage lui-même : jusqu'où nettoyer automatiquement un modèle
+   dont on prétend donner les cotes fidèlement ?
 - Export 3MF (ZIP + XML) prêt pour Bambu Studio.
 - Pièce test « éprouvette de tolérance » pour régler le jeu.
 - **Validé quand** : le support de l'interphone Wi-Fi est imprimé et monté.

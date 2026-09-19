@@ -887,6 +887,62 @@ point à point — et le dire.
   factorisée entre le disque et le trait.
 - `VisionneuseView.swift` — le libellé de la mesure sous la distance.
 
+## Tranche 3 — étape 2 : silhouette de l'objet
+
+Ajoutés le 20/09/2026. Obtenir le contour de l'objet vu depuis le mur,
+**dilaté du jeu** — c'est la forme de la future cavité.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Geometry2D/Polygon.swift`
+
+**Rôle** : un contour fermé dans le plan, et ce qu'on en sait (aire, sens,
+périmètre, appartenance, simplification).
+
+- L'**aire signée** (formule du lacet) porte l'orientation : positive pour un
+  contour extérieur, négative pour un trou. Une seule valeur dit deux choses.
+- `contains` par lancer de rayon : on compte les arêtes traversées à droite du
+  point ; un nombre impair veut dire « dedans ».
+- Douglas-Peucker **récursif**, adapté aux contours fermés : on coupe au point
+  le plus éloigné du premier, sinon la simplification déformerait un bout.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Geometry2D/ProjectionPlane.swift`
+
+**Rôle** : passer de l'espace du maillage au plan 2D, et revenir.
+
+- Les six directions sont écrites à la main pour que `u × v = normale` — un
+  repère **direct**. Le test le vérifie pour les six : une erreur de signe
+  donnerait une pièce en miroir, et on ne s'en apercevrait qu'à l'impression.
+- `@Test(arguments:)` sur un `CaseIterable` : un test, six cas.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Geometry2D/Silhouette.swift`
+
+**Rôle** : de la soupe de triangles au contour dilaté, en cinq passes.
+
+- **Pourquoi une grille** plutôt qu'un offset de polygone : dilater un contour
+  concave en déplaçant ses sommets crée des auto-intersections. Par la
+  distance, le problème n'existe pas.
+- **Composantes connexes** par remplissage avec une pile explicite (pas de
+  récursion : une région de 4 millions de cellules ferait exploser la pile).
+- **Transformée de distance de Felzenszwalb** : l'enveloppe inférieure de
+  paraboles, deux passes 1D, temps linéaire, distances exactes. Subtilité
+  Swift : « l'infini » est un grand nombre **fini** (1e20), sinon l'addition
+  déborde et produit des NaN.
+- **Marching squares** : chaque arête de la grille porte au plus un passage par
+  zéro, elle sert donc de **clé entière** pour recoller les segments — aucune
+  comparaison de flottants dans le recollage. Les deux cas ambigus sont tranchés
+  par la moyenne des quatre coins.
+- Les segments sont émis avec l'intérieur **à gauche** : les contours
+  extérieurs sortent dans le sens trigonométrique et les trous à l'envers,
+  exactement la convention attendue par un triangulateur.
+
+### `Geometry2DTests.swift`
+
+- Des maillages **fabriqués en 2D** (`plaque`, `rectangle`, `disque`) : les
+  formes attendues sont connues à la main, aucun fichier n'est nécessaire.
+- `toleranceAire(perimetre:pas:)` : la tolérance dit la limite de la méthode
+  (un biais d'une demi-cellule le long du périmètre) au lieu d'un nombre magique.
+- Le plafond mémoire est un **paramètre** de l'appel : le test le réduit pour
+  rester instantané, l'app garde la valeur de production.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

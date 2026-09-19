@@ -134,20 +134,45 @@ coïncider au dixième et tomber près de 50 mm sans calibrage ; le libellé doi
 indiquer « Épaisseur entre deux faces ». Viser ensuite un coin : le repère doit
 redevenir une bille et le libellé « Entre deux points ».
 
-### Étape 2 — Silhouette de l'objet (Core, `Geometry2D/`)
+### Étape 2 — Silhouette de l'objet — livrée le 20/09/2026
 
-- `Polygon.swift` — polygone 2D : aire signée, orientation, périmètre,
-  simplification Douglas-Peucker, test de point intérieur.
-- `Silhouette.swift` — de `Mesh` + direction du mur + jeu vers un polygone :
-  rastérisation (pas 0,1 mm), plus grande composante connexe, transformée de
-  distance, marching squares sur l'isoligne `jeu`, simplification à 0,05 mm.
-- Tests : disque de 20 mm dilaté de 1 mm → rayon 11 mm à 0,05 près ; carré →
-  carré à coins arrondis du rayon du jeu ; forme en U dont l'entaille fait moins
-  de deux fois le jeu → entaille refermée ; deux composantes → seule la plus
-  grande survit ; aire et orientation conservées.
+Core (`Geometry2D/`) :
+- `Polygon.swift` — contour fermé : aire signée (donc orientation : sens
+  trigonométrique pour un extérieur, horaire pour un trou), périmètre, boîte
+  englobante, test d'appartenance par lancer de rayon, simplification
+  Douglas-Peucker adaptée aux contours **fermés** (coupés au point le plus
+  éloigné du premier, pour ne pas déformer un bout).
+- `ProjectionPlane.swift` — les six directions de projection, avec des axes
+  choisis pour que le repère (u, v, normale) reste **direct** : sans cette
+  précaution, la silhouette serait le miroir de l'objet et la pièce ne
+  s'emboîterait que dans son reflet.
+- `Silhouette.swift` — `Mesh` + direction + jeu → contour extérieur et trous :
+  1. rastérisation des triangles projetés (pas 0,1 mm par défaut) ;
+  2. **plus grande composante connexe** — les miettes de table et les voiles
+     détachés d'un scan disparaissent ici, sans toucher au maillage mesuré ;
+  3. **champ de distance signé** (Felzenszwalb, exact, deux passes linéaires) ;
+  4. **marching squares** sur l'isoligne `jeu`, avec les cas ambigus tranchés
+     par la valeur au centre, et recollage des segments par identifiant d'arête
+     — aucune comparaison de flottants ;
+  5. simplification, tri du contour extérieur et des trous.
+- Tests (`Geometry2DTests.swift`, 3 suites, 12 tests) : disque de 10 mm dilaté
+  de 1 mm → rayon 11 mm à 0,4 mm près ; carré → coins arrondis du rayon du jeu,
+  aire = carré + quatre bandes + un disque ; entaille de 3 mm **refermée** par
+  un jeu de 2 mm, conservée par un jeu de 0,3 mm ; miette ignorée ; anneau →
+  un trou, orienté à l'envers, rétréci du jeu ; plafond mémoire respecté.
 
-Risque : le coût de la grille. 150 mm au pas de 0,1 mm = 1500 × 1500 cellules,
-soit 9 Mo en `Float` — maîtrisé, calcul sous la seconde. Pas et étendue bornés.
+**Deux limites, chiffrées** :
+- le contour est échantillonné au centre des cellules : il porte un biais
+  d'environ une demi-cellule, soit 0,05 mm au pas par défaut. Les tolérances
+  des tests le disent explicitement (`toleranceAire`), au lieu de le cacher ;
+- la grille est plafonnée à 4 millions de cellules (16 Mo) ; au-delà, le pas
+  s'élargit tout seul plutôt que de faire tomber l'app. Sur un objet de 19 cm au
+  pas de 0,1 mm, on est à 3,6 millions de cellules — environ 8 s **en debug**
+  sur Mac, donc quelques secondes en release : la génération devra tourner hors
+  du fil principal (étape 4).
+
+Aucun changement visible dans l'app à cette étape : la vérification est la
+suite de tests.
 
 ### Étape 3 — Solides et générateur (Core, `Solid/` et `Support/`)
 

@@ -117,14 +117,14 @@ struct VisionneuseView: View {
 
     private var panneau: some View {
         VStack(spacing: 12) {
-            if let distance = model.distanceMM {
+            if let mesure = model.mesure, let distance = model.distanceMM {
                 Text(DimensionsFormatter.millimeters(distance))
                     .font(.largeTitle.bold())
                     .monospacedDigit()
-                    .accessibilityLabel("Distance entre A et B : \(DimensionsFormatter.spokenCentimeters(distance))")
+                    .accessibilityLabel("\(mesure.kind.phrase) : \(DimensionsFormatter.spokenCentimeters(distance))")
                 Text(model.calibration == nil
-                     ? "Entre le point A (jaune) et le point B (bleu)"
-                     : "Entre A et B, cote calibrée")
+                     ? mesure.kind.titre
+                     : "\(mesure.kind.titre) · cote calibrée")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -136,21 +136,21 @@ struct VisionneuseView: View {
                 .controlSize(.large)
                 .accessibilityHint("Recale l'échelle du scan sur une cote réelle, mesurée à la main ou lue sur une carte bancaire.")
             } else {
-                Text(model.pointA == nil
+                Text(model.cibleA == nil
                      ? "Touchez un premier point sur l'objet."
                      : "Touchez le second point.")
                     .font(.headline)
-                Text("Glissez pour tourner autour, pincez pour zoomer. Comptez quelques millimètres d'écart : contrôlez au pied à coulisse avant d'imprimer.")
+                Text("Visez une surface plane : l'app reconnaît la face et mesure d'une face à l'autre, sans dépendre du millimètre près où vous avez touché. Glissez pour tourner, pincez pour zoomer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             HStack(spacing: 12) {
-                Button("Effacer les points") {
+                Button("Effacer la mesure") {
                     model.effacer()
                 }
-                .disabled(model.pointA == nil)
+                .disabled(model.cibleA == nil)
 
                 // Filet de sécurité : à force de tourner et de zoomer, on perd
                 // l'objet hors de l'écran sans savoir comment y revenir.

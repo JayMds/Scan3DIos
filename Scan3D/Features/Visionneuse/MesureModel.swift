@@ -29,9 +29,11 @@ final class MesureModel {
 
     private(set) var etat: Etat = .chargement
     private(set) var orbite: OrbitCamera
-    private(set) var pointA: SIMD3<Float>?
-    private(set) var pointB: SIMD3<Float>?
-    private(set) var mesure: SegmentMeasurement?
+    /// Ce que l'utilisateur a désigné : une face quand la surface est plane
+    /// sous son doigt, un point sinon. Il n'a aucun mode à choisir.
+    private(set) var cibleA: MeasurementTarget?
+    private(set) var cibleB: MeasurementTarget?
+    private(set) var mesure: SurfaceMeasurement?
     private(set) var annonce: Annonce?
     /// Calibrage du scan : la distance affichée en tient compte (décision E2).
     private(set) var calibration: ScaleCalibration?
@@ -190,38 +192,44 @@ final class MesureModel {
             annoncer("Aucun point du modèle à cet endroit")
             return
         }
-        poser(touche.point)
+        // Surface plane sous le doigt → on désigne la **face** : la mesure ne
+        // dépend alors plus du millimètre près où l'on a visé.
+        if let plan = maillage.fitPlane(around: touche.point) {
+            poser(.face(plan, anchor: plan.projection(of: touche.point)))
+        } else {
+            poser(.point(touche.point))
+        }
     }
 
     func effacer() {
-        pointA = nil
-        pointB = nil
+        cibleA = nil
+        cibleB = nil
         mesure = nil
         rafraichirMarqueurs()
-        annoncer("Points effacés")
+        annoncer("Mesure effacée")
     }
 
-    private func poser(_ point: SIMD3<Float>) {
-        switch (pointA, pointB) {
+    private func poser(_ cible: MeasurementTarget) {
+        switch (cibleA, cibleB) {
         case (nil, _):
-            pointA = point
-            annoncer("Point A posé")
+            cibleA = cible
+            annoncer(cible.poseAnnoncee(repere: "A"))
         case (let a?, nil):
-            pointB = point
-            let segment = SegmentMeasurement(start: a, end: point)
-            mesure = segment
-            let distance = segment.lengthMM(calibratedBy: calibration)
-            annoncer("Point B posé. Distance : \(DimensionsFormatter.spokenCentimeters(distance))")
+            cibleB = cible
+            let nouvelle = SurfaceMeasurement(from: a, to: cible)
+            mesure = nouvelle
+            let distance = nouvelle.lengthMM(calibratedBy: calibration)
+            annoncer("\(cible.poseAnnoncee(repere: "B")). \(nouvelle.kind.phrase) : \(DimensionsFormatter.spokenCentimeters(distance))")
             // Une distance mesurée n'est pas une donnée personnelle : publique,
             // c'est elle que le test terrain compare au pied à coulisse. La cote
             // brute est journalisée à côté de la cote calibrée.
-            Logger.mesure.info("Mesure A-B : \(DimensionsFormatter.millimeters(distance), privacy: .public) (brute : \(DimensionsFormatter.millimeters(segment.lengthMM), privacy: .public))")
+            Logger.mesure.info("\(nouvelle.kind.phrase, privacy: .public) : \(DimensionsFormatter.millimeters(distance), privacy: .public) (brute : \(DimensionsFormatter.millimeters(nouvelle.lengthMM), privacy: .public))")
         default:
             // Troisième toucher : on recommence une mesure là où l'on a touché.
-            pointA = point
-            pointB = nil
+            cibleA = cible
+            cibleB = nil
             mesure = nil
-            annoncer("Nouvelle mesure. Point A posé")
+            annoncer("Nouvelle mesure. \(cible.poseAnnoncee(repere: "A"))")
         }
         rafraichirMarqueurs()
     }
@@ -237,14 +245,33 @@ final class MesureModel {
     private func rafraichirMarqueurs() {
         marqueurs.children.removeAll()
         let rayon = max(0.002, maillage.boundingBox.size.max() * 0.015)
-        if let pointA {
-            marqueurs.addChild(bille(pointA, couleur: .systemYellow, rayon: rayon))
+        if let cibleA {
+            marqueurs.addChild(repere(cibleA, couleur: .systemYellow, rayon: rayon))
         }
-        if let pointB {
-            marqueurs.addChild(bille(pointB, couleur: .systemTeal, rayon: rayon))
+        if let cibleB {
+            marqueurs.addChild(repere(cibleB, couleur: .systemTeal, rayon: rayon))
         }
-        if let mesure, let trait = trait(de: mesure, rayon: rayon * 0.3) {
+        // Le trait d'une épaisseur traverse l'objet : il est souvent caché, et
+        // c'est normal — ce sont les deux disques qui portent l'information.
+        if let mesure, let trait = trait(de: mesure.segment, rayon: rayon * 0.3) {
             marqueurs.addChild(trait)
+        }
+    }
+
+    /// Un disque posé à plat sur la face reconnue, une bille pour un simple point.
+    private func repere(_ cible: MeasurementTarget, couleur: UIColor, rayon: Float) -> ModelEntity {
+        switch cible {
+        case .point(let position):
+            return bille(position, couleur: couleur, rayon: rayon)
+        case .face(let plan, let ancre):
+            let disque = ModelEntity(
+                mesh: .generateCylinder(height: rayon * 0.4, radius: plan.radius * 0.75),
+                materials: [UnlitMaterial(color: couleur)]
+            )
+            // Légèrement décollé, sinon il clignote contre la surface.
+            disque.position = ancre + plan.normal * (rayon * 0.25)
+            disque.orientation = rotation(de: [0, 1, 0], vers: plan.normal)
+            return disque
         }
     }
 
@@ -266,15 +293,17 @@ final class MesureModel {
         // Le cylindre est aligné sur Y : on le bascule vers la direction du
         // segment. Le cas « exactement à l'opposé » n'a pas de rotation unique,
         // d'où le demi-tour explicite (sinon le quaternion renvoie des NaN).
-        let direction = ecart / longueur
-        let alignement = simd_dot(SIMD3<Float>(0, 1, 0), direction)
-        if alignement > 0.9999 {
-            trait.orientation = simd_quatf(angle: 0, axis: [1, 0, 0])
-        } else if alignement < -0.9999 {
-            trait.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
-        } else {
-            trait.orientation = simd_quatf(from: [0, 1, 0], to: direction)
-        }
+        trait.orientation = rotation(de: [0, 1, 0], vers: ecart / longueur)
         return trait
+    }
+
+    /// Rotation qui amène un axe sur un autre. Le cas « exactement à l'opposé »
+    /// n'a pas de rotation unique, d'où le demi-tour explicite : sans lui, le
+    /// quaternion renvoie des NaN.
+    private func rotation(de axe: SIMD3<Float>, vers cible: SIMD3<Float>) -> simd_quatf {
+        let alignement = simd_dot(axe, cible)
+        if alignement > 0.9999 { return simd_quatf(angle: 0, axis: [1, 0, 0]) }
+        if alignement < -0.9999 { return simd_quatf(angle: .pi, axis: [1, 0, 0]) }
+        return simd_quatf(from: axe, to: cible)
     }
 }

@@ -49,6 +49,12 @@ mode :
 Attendu : l'arrondi des arêtes sort de l'équation, et la dispersion de visée
 (1,9 mm mesurée en tranche 2) tombe au dixième.
 
+Deux limites assumées : l'ajustement **refuse à moins d'un rayon d'une arête**
+— c'est ce qui protège la mesure des congés, et un rayon plus court est tenté
+automatiquement —, et il lui faut **plusieurs triangles sous ce rayon**, ce
+qu'un scan d'iPhone fournit largement. Dans les deux cas de refus, l'app
+retombe sur un point et le dit.
+
 ### Silhouette de l'objet (décision G2)
 
 De `Mesh` + direction du mur + jeu vers un polygone, en passant par une

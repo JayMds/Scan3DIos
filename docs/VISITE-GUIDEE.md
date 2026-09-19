@@ -833,6 +833,60 @@ réinitialisation.
 - Le cube est décrit par 8 sommets et 12 triangles, orientés dans le sens
   trigonométrique vu de l'extérieur pour que les normales pointent dehors.
 
+## Tranche 3 — étape 1 : mesure de face à face
+
+Ajoutés le 19/09/2026. On ne vise plus un point, on désigne une **face** : le
+plan s'appuie sur des dizaines de triangles, donc la mesure ne dépend plus du
+millimètre près où le doigt s'est posé.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/TriangleGeometry.swift`
+
+**Rôle** : le point d'un triangle le plus proche d'un point donné.
+
+- Algorithme d'Ericson : on teste les trois sommets, les trois arêtes, puis
+  l'intérieur — une suite de `if` dont chaque test élimine une région.
+- `enum` sans cas, seulement des fonctions statiques : un espace de noms, pas
+  un type que l'on instancie (§4 de `SWIFT-POUR-TS.md`).
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/PlaneFit.swift`
+
+**Rôle** : ajuster un plan sur la surface autour du point touché — ou refuser.
+
+- La normale est la **somme des produits vectoriels** des triangles retenus.
+  Chaque produit vaut deux fois l'aire du triangle : la somme pondère donc par
+  l'aire sans qu'on l'écrive. Sa longueur, comparée à la somme des aires, donne
+  la « cohérence » — un pli fait s'annuler les normales, et l'arête est écartée.
+- Deux surcharges de `fitPlane` : l'une prend un rayon, l'autre en essaie
+  plusieurs (surcharge de méthode, §7).
+- `guard … else { return nil }` en cascade : chaque condition de refus est
+  lisible sur une ligne.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Measure/SurfaceMeasurement.swift`
+
+**Rôle** : décider **ce que la mesure veut dire** — épaisseur, point à face, ou
+point à point — et le dire.
+
+- `switch` sur un **couple d'enums** avec clauses `where` : les trois
+  sémantiques tiennent dans une seule expression, et le compilateur vérifie
+  qu'aucun cas ne manque.
+- Un type qui en enveloppe un autre : `SurfaceMeasurement` ajoute le sens,
+  `SegmentMeasurement` garde la géométrie. Aucun code dupliqué.
+
+### `Scan3D/Features/Visionneuse/SurfaceMeasurement+Texte.swift`
+
+**Rôle** : les libellés (« Épaisseur entre deux faces », « Face A posée »).
+
+- Même partage que `CaptureHint+Texte.swift` : `Scan3DCore` décide de la
+  géométrie, l'app décide des mots — et l'accord du participe change selon
+  qu'on a posé un point ou une face.
+
+### Modifiés à l'étape 1
+
+- `MesureModel.swift` — des **cibles** (point ou face) au lieu de points ; un
+  disque posé à plat pour une face ; la rotation d'un axe vers un autre est
+  factorisée entre le disque et le trait.
+- `VisionneuseView.swift` — le libellé de la mesure sous la distance.
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

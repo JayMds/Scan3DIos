@@ -77,30 +77,62 @@ scénario iPhone, commit local ; push après le test de Jinkuro.
 (décisions G1-G4, sort des trois pistes de précision) et de `CLAUDE.md`
 (tranche en cours, moteur géométrique).
 
-### Étape 1 — Mesure de face à face
+### Étape 1 — Mesure de face à face — livrée le 19/09/2026, test iPhone en attente
 
 Core (`Measure/`) :
-- `PlaneFit.swift` — `Mesh.fitPlane(around:radius:) -> PlaneFit?` : triangles
-  dont le centre est dans le rayon, normale moyenne **pondérée par l'aire**,
-  puis résidu quadratique des sommets au plan. Refus si le résidu dépasse le
-  seuil, si les triangles sont trop peu nombreux ou trop alignés — ce qui écarte
-  naturellement les coins et les arêtes. Rayon proportionné à l'objet.
-- `SurfaceMeasurement.swift` — trois mesures bien définies selon ce qui a été
-  touché : **épaisseur** entre deux plans parallèles (à moins de ~10° l'un de
-  l'autre), **distance point-plan**, et point-point en dernier recours. Chaque
-  cas porte son libellé : l'écran dira ce qu'il a mesuré.
-- Tests : sur le cube, ajustement au centre d'une face → normale exacte, résidu
-  nul ; au coin → refus ; **épaisseur entre deux faces opposées = 50,000 mm quel
-  que soit l'endroit touché** (le test qui prouve que la dispersion de visée a
-  disparu) ; deux faces adjacentes → pas d'épaisseur.
+- `TriangleGeometry.swift` — point d'un triangle le plus proche d'un point
+  (algorithme d'Ericson). Sert à décider quels triangles sont « autour » du
+  doigt : juger par le centre d'un triangle exclurait une grande face dont on
+  touche le bord.
+- `PlaneFit.swift` — `Mesh.fitPlane(around:radius:)` : la normale est la
+  **somme des produits vectoriels** des triangles retenus, ce qui pondère par
+  l'aire sans calcul supplémentaire. Trois refus possibles : cohérence
+  `|Σn| / Σ|n|` sous 0,98 (un pli — donc une arête ou un coin), résidu au-delà
+  de 6 % du rayon (une surface courbe), moins de trois triangles. Rayon = 4 %
+  de la plus grande cote, au moins 3 mm. Variante
+  `fitPlane(around:searchingRadii:)` qui dégrade le rayon (r, r/2, r/4) : sans
+  elle, impossible de désigner un méplat proche d'une arête.
+- `SurfaceMeasurement.swift` — `MeasurementTarget` (un point, ou une face avec
+  l'ancre du toucher projetée dessus) et les trois sémantiques : **épaisseur**
+  entre deux plans parallèles (moins de 10° d'écart) et **non confondus**,
+  **distance point-plan**, point-point sinon. La coplanarité est traitée : deux
+  touchers sur la même face mesurent la distance qui les sépare, et non une
+  épaisseur nulle.
+- Tests (`PlaneFitTests.swift`, 2 suites, 13 tests) : face du cube → normale
+  exacte et résidu nul ; arête et coin → refus ; sphère → refus dès que le plan
+  mentirait ; rayon dégressif près d'une arête ; distances signées et
+  projection ; **épaisseur = 50,00 mm pour trois couples de touchers très
+  différents** — le test qui prouve que la dispersion de visée a disparu ;
+  faces adjacentes, même face, point-face, calibrage.
 
-App : `MesureModel` pose une **face** (petit disque) ou un **point** (bille)
-selon le résultat de l'ajustement ; `VisionneuseView` affiche le libellé
-correspondant. Aucun sélecteur de mode.
+App :
+- `MesureModel` — ajustement à chaque toucher ; **disque** posé à plat pour une
+  face, **bille** pour un point ; annonces « Face A posée » ou « Point A posé » ;
+  le journal nomme la mesure.
+- `SurfaceMeasurement+Texte.swift` — les libellés (les mots sont à l'app, la
+  géométrie à `Scan3DCore`).
+- `VisionneuseView` — libellé sous la distance, « Effacer la mesure », et un
+  texte d'aide qui invite à viser une surface plutôt qu'un point.
+
+**Banc d'essai (simulateur, 19/09/2026)** : boîte de 190 × 57 × 160 mm,
+subdivisée à 5 mm comme un scan réel ; séquence automatique — toucher du
+dessus, rotation sous l'objet, toucher du dessous. Résultat affiché :
+**« 57,0 mm — Épaisseur entre deux faces »**, disque posé à plat sur la face.
+
+Deux limites, découvertes au banc et assumées :
+- l'ajustement **refuse à moins d'un rayon d'une arête**. C'est précisément ce
+  qui protège la mesure des congés de reconstruction ; la recherche dégressive
+  rattrape les petits méplats.
+- il lui faut **plusieurs triangles sous le rayon** : sur un maillage grossier
+  (triangles de 30 mm), aucune face n'est reconnue et l'app retombe sur des
+  points. Un scan d'iPhone, avec ses triangles de 2 à 3 mm, est largement assez
+  dense.
 
 Test iPhone : mesurer la hauteur de la boîte en touchant le dessus puis le
-dessous, trois fois à des endroits différents → les trois valeurs coïncident au
-dixième, et tombent près de 50 mm sans calibrage.
+dessous, **trois fois à des endroits différents** → les trois valeurs doivent
+coïncider au dixième et tomber près de 50 mm sans calibrage ; le libellé doit
+indiquer « Épaisseur entre deux faces ». Viser ensuite un coin : le repère doit
+redevenir une bille et le libellé « Entre deux points ».
 
 ### Étape 2 — Silhouette de l'objet (Core, `Geometry2D/`)
 

@@ -943,6 +943,61 @@ périmètre, appartenance, simplification).
 - Le plafond mémoire est un **paramètre** de l'appel : le test le réduit pour
   rester instantané, l'app garde la valeur de production.
 
+## Tranche 3 — étape 3 : solides et générateur de support
+
+Ajoutés le 20/09/2026. De la silhouette à une pièce imprimable, sans booléen
+général : la pièce est **décomposable** en faces, parois et trous.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Solid/PolygonTriangulator.swift`
+
+**Rôle** : découper un contour — avec ses trous — en triangles.
+
+- Méthode des **oreilles** : on coupe une à une les pointes convexes qui ne
+  contiennent aucun autre sommet. Boucle `while` sur une liste qu'on ampute :
+  le cas « aucune oreille trouvée » lève une erreur plutôt que de tourner sans fin.
+- **Pont** vers un trou : deux sommets dupliqués suffisent à transformer un
+  contour troué en contour simple. C'est plus malin qu'il n'y paraît — et le
+  test d'Eberly évite qu'il traverse la matière.
+- `Triangulation.area` : la somme des aires doit valoir celle du contour, trous
+  déduits. Un recouvrement la gonfle, un manque la réduit — c'est l'invariant
+  qui attrape les deux.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Solid/MeshBuilder.swift`
+
+**Rôle** : assembler des triangles en maillage, et dire si la pièce est
+imprimable.
+
+- **Soudure** des sommets par un dictionnaire dont la clé est la position
+  arrondie au micron (`SIMD3<Int32>`). Sans elle, chaque triangle aurait ses
+  propres sommets et l'étanchéité serait invérifiable.
+- `isWatertight` : chaque arête doit être parcourue **deux fois en sens
+  inverse**. On compte `+1` ou `−1` selon l'ordre des indices ; une somme non
+  nulle signale un trou.
+- `signedVolume` par le théorème de la divergence : positif quand les normales
+  sortent, donc négatif si la pièce est retournée à l'envers.
+
+### `Packages/Scan3DCore/Sources/Scan3DCore/Support/WallMount.swift`
+
+**Rôle** : les réglages d'un support mural, et la pièce qui en sort.
+
+- Une `struct` de paramètres avec des valeurs par défaut, et `testSlice(height:)`
+  qui renvoie **les mêmes réglages en plus court** : l'emboîtement se joue dans
+  le plan, la hauteur n'y change rien — d'où un essai à quinze minutes
+  d'impression au lieu de trois heures.
+- `WallMountError` enveloppe les erreurs des couches du dessous
+  (`.silhouette`, `.triangulation`, `.mesh`) : l'appelant voit une seule famille.
+- L'assemblage est une suite de six appels lisibles ; c'est la contrepartie du
+  choix « pas de booléen général » (décision G1).
+
+### `SolidTests.swift` et `WallMountTests.swift`
+
+- L'**invariant** est testé sur cinq jeux de réglages et six orientations :
+  étanche, orientée dehors, volume positif.
+- Le volume 3D est comparé à une formule tirée des **aires 2D** des contours :
+  deux chemins de calcul indépendants qui doivent tomber d'accord à 2 %.
+- Tolérances **relatives** là où les `Float` ne tiennent pas l'absolu (une aire
+  de 8 000 mm² accumulée sur cent triangles).
+
 ## Les fichiers non-Swift
 
 - `project.yml` — source de vérité du `.xcodeproj` (jamais éditer ce

@@ -174,21 +174,46 @@ Core (`Geometry2D/`) :
 Aucun changement visible dans l'app à cette étape : la vérification est la
 suite de tests.
 
-### Étape 3 — Solides et générateur (Core, `Solid/` et `Support/`)
+### Étape 3 — Solides et générateur — livrée le 20/09/2026
 
-- `PolygonTriangulator.swift` — triangulation par **oreilles avec ponts** pour
-  les contours à trous : la brique qui permet la face avant (rectangle moins la
-  poche moins les trous de vis). Pièges connus : points alignés, points doublés,
-  trou tangent au contour → filtrés en amont par la simplification.
-- `MeshBuilder.swift` — accumule des triangles et rend un `Mesh` ;
-  `isWatertight` (chaque arête partagée par exactement deux triangles,
-  orientations opposées) et volume signé.
-- `WallMount.swift` — paramètres → `Mesh` : plaque, poche extrudée depuis la
-  silhouette, parois, fond, trous cylindriques, hauteur de tranche d'essai.
-- Tests : **toute pièce générée est étanche, orientée vers l'extérieur et de
-  volume positif** (invariant vérifié sur une dizaine de jeux de paramètres) ;
-  cotes attendues au dixième ; la poche contient la silhouette dilatée et rien
-  de plus ; la tranche d'essai est la même pièce tronquée en hauteur.
+Core (`Solid/` et `Support/`) :
+- `PolygonTriangulator.swift` — triangulation par **oreilles**, avec des
+  **ponts** vers les trous : deux sommets dupliqués transforment un contour
+  troué en contour simple. Le pont vise le sommet visible le plus à droite,
+  affiné par le test d'Eberly (un sommet rentrant dans le triangle de visée
+  l'emporte), sans quoi le pont traverserait la matière.
+- `MeshBuilder.swift` — assemble des triangles en **soudant** les sommets
+  (1 µm). La soudure n'est pas une optimisation : sans elle, aucune arête ne
+  serait partagée et le contrôle d'étanchéité n'aurait rien à mesurer.
+  Fournit aussi `addWall` (paroi verticale le long d'un contour, normales
+  dedans ou dehors) et la pose d'une triangulation à plat.
+- `Mesh.isWatertight`, `Mesh.openEdgeCount`, `Mesh.signedVolume`,
+  `Mesh.scaled(by:)` — les invariants d'une pièce imprimable.
+- `WallMount.swift` — réglages (jeu, marge, épaisseur du fond, hauteur des
+  parois, diamètre et entraxe des vis) → `Mesh`. Six faces assemblées : dessous
+  percé, fond de poche percé, couronne du dessus, paroi extérieure, paroi de
+  poche, parois des trous. La **tranche d'essai** n'est qu'un réglage de hauteur.
+- Tests (`SolidTests.swift` et `WallMountTests.swift`, 3 suites, 20 tests) :
+  aires conservées par la triangulation (carré, L concave, trou carré, deux
+  trous ronds, points alignés, trou hors contour refusé) ; cube étanche, face
+  manquante détectée, cube retourné de volume négatif ; **invariant sur cinq
+  jeux de réglages et sur les six orientations** ; volume déduit des aires des
+  contours à 2 % près ; cotes ; tranche d'essai ; trous trop gros refusés.
+
+**Deux défauts que seul l'invariant pouvait attraper** — invisibles à l'œil,
+fatals à l'usage :
+1. la simplification d'un contour fermé conservait ses deux **points de
+   coupure**, même alignés ; le triangulateur, lui, supprime un sommet aligné.
+   Face et paroi construites depuis le même contour n'avaient donc plus les
+   mêmes arêtes : pièce non étanche. Corrigé à la source par
+   `Polygon.removingCollinear`.
+2. le recollage des segments de marching squares parcourait un **dictionnaire**,
+   dont l'ordre varie d'une exécution à l'autre : la boucle démarrait à un
+   endroit différent, et la simplification rendait un contour légèrement
+   différent. Deux appels identiques donnent maintenant la même pièce, et un
+   test le vérifie.
+
+Aucun changement visible dans l'app à cette étape.
 
 ### Étape 4 — L'écran « Créer un support » (App, `Features/Support/`)
 

@@ -199,6 +199,17 @@ struct SilhouetteTests {
         }
     }
 
+    @Test("Deux appels identiques donnent exactement le même contour")
+    func deterministe() throws {
+        let maillage = try plaque([rectangle(x: -0.02, y: -0.015, largeur: 0.04, hauteur: 0.03)])
+        let premier = try Silhouette.outline(of: maillage, onto: Self.plan, clearance: 0.001, step: 0.0003)
+        let second = try Silhouette.outline(of: maillage, onto: Self.plan, clearance: 0.001, step: 0.0003)
+        // Sans tri du recollage, l'ordre d'un dictionnaire ferait varier le
+        // point de départ du contour, donc sa simplification.
+        #expect(premier.outer == second.outer)
+        #expect(premier.holes == second.holes)
+    }
+
     @Test("Le pas s'élargit plutôt que de faire exploser la mémoire")
     func plafondMemoire() throws {
         let maillage = try plaque([rectangle(x: -0.05, y: -0.05, largeur: 0.1, hauteur: 0.1)])

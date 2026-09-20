@@ -97,7 +97,33 @@ public struct Polygon: Equatable, Sendable {
         var resultat = Self.douglasPeucker(premiere, tolerance: tolerance)
         resultat.removeLast()
         resultat += Self.douglasPeucker(seconde, tolerance: tolerance).dropLast()
-        return Polygon(points: resultat) ?? self
+        return (Polygon(points: resultat) ?? self).removingCollinear(tolerance: tolerance)
+    }
+
+    /// Retire les sommets qui n'apportent rien : deux points confondus, ou un
+    /// point posé sur la droite qui joint ses voisins.
+    ///
+    /// Ce n'est pas de la coquetterie. Les deux points de coupure du parcours
+    /// survivent toujours à la simplification, même alignés ; le triangulateur,
+    /// lui, supprime un sommet aligné. La face et la paroi construites depuis le
+    /// même contour n'auraient alors plus les mêmes arêtes, et la pièce ne
+    /// serait **pas étanche** — invisible à l'œil, fatal au slicer.
+    public func removingCollinear(tolerance: Float) -> Polygon {
+        var restants = points
+        var aRetirer = true
+        while aRetirer, restants.count > 3 {
+            aRetirer = false
+            for index in restants.indices {
+                let nombre = restants.count
+                let avant = restants[(index + nombre - 1) % nombre]
+                let apres = restants[(index + 1) % nombre]
+                guard Self.distanceAuSegment(restants[index], avant, apres) <= tolerance else { continue }
+                restants.remove(at: index)
+                aRetirer = true
+                break
+            }
+        }
+        return Polygon(points: restants) ?? self
     }
 
     private static func douglasPeucker(_ chaine: [SIMD2<Float>], tolerance: Float) -> [SIMD2<Float>] {

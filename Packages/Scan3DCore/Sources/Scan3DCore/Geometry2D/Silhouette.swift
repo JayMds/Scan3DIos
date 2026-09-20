@@ -334,7 +334,12 @@ public struct Silhouette: Equatable, Sendable {
 
         var boucles: [[SIMD2<Float>]] = []
         var vues = Set<Int>()
-        for depart in suivant.keys where !vues.contains(depart) {
+        // `sorted()` n'est pas une coquetterie : l'ordre d'un dictionnaire varie
+        // d'une exécution à l'autre, la boucle démarrerait donc à un endroit
+        // différent à chaque appel — et la simplification, qui dépend du point
+        // de départ, rendrait un contour légèrement différent. Deux appels
+        // identiques doivent donner la même pièce.
+        for depart in suivant.keys.sorted() where !vues.contains(depart) {
             var boucle: [SIMD2<Float>] = []
             var courante = depart
             while let segment = suivant[courante], !vues.contains(courante) {
